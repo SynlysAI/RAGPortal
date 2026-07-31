@@ -20,7 +20,7 @@ cd backend
 conda activate ragportal
 pip install -r requirements.txt
 cp ../.env.example ../.env      # 修改其中的密钥与域名
-uvicorn app.main:app --reload --port 8002
+uvicorn app.main:app --reload --port 8004
 
 # 前端(另开终端)
 cd frontend
@@ -48,10 +48,10 @@ pm2 save
 ```nginx
 server {
     listen 80;
-    server_name rag.wumiaox.com;
+    server_name rag.xmuzc.com;
 
     location / {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:8004;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         client_max_body_size 100M;
@@ -70,7 +70,7 @@ server {
   icon: '📚',
   accentColor: '#2563eb',
   accentTextClass: 'var(--accent-blue-text)',
-  url: 'https://rag.wumiaox.com',
+  url: 'https://rag.xmuzc.com',
 }
 ```
 

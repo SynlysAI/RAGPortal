@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     auth_token_expire_hours: int = 24
 
     # AI4MS
+    ai4ms_api_base_url: str = ""
     ai4ms_base_url: str
     ai4ms_portal_url: str
 
@@ -52,6 +53,25 @@ class Settings(BaseSettings):
             for t in self.allowed_file_types.split(",")
             if t.strip()
         }
+
+    @property
+    def resolved_ai4ms_api_base_url(self) -> str:
+        """返回 AI4MS API 基础地址。
+
+        优先使用显式配置的 `AI4MS_API_BASE_URL`。
+        未配置时，基于 `AI4MS_BASE_URL` 自动补齐 `/api/v1`。
+
+        Returns:
+            规范化后的 AI4MS API 基础地址。
+        """
+        api_base = self.ai4ms_api_base_url.strip().rstrip("/")
+        if api_base:
+            return api_base
+
+        base_url = self.ai4ms_base_url.strip().rstrip("/")
+        if base_url.endswith("/api/v1"):
+            return base_url
+        return f"{base_url}/api/v1"
 
 
 @lru_cache

@@ -5,7 +5,7 @@
 | 文档日期 | 2026-07-31 |
 | 项目名称 | RAGPortal |
 | 项目路径 | `E:\github_project\RAGPortal`(待创建) |
-| 部署形态 | 独立子域名(如 `rag.wumiaox.com`) |
+| 部署形态 | 独立子域名(如 `rag.xmuzc.com`) |
 | 上游依赖 | AI4MS 门户(认证源)、WeKnora(文档存储与解析) |
 | 是否改动 WeKnora | **否** |
 | 是否改动 AI4MS | **否**(`HomePage` 卡片配置追加是可选项,由用户自行决定) |
@@ -502,11 +502,11 @@ AUTH_SECRET=<与 AI4MS AUTH_SECRET 完全一致>
 AUTH_TOKEN_EXPIRE_HOURS=24          # 仅用于本地校验参考,实际以 token 内 exp 为准
 
 # ===== AI4MS 门户对接 =====
-AI4MS_BASE_URL=https://ai4ms.wumiaox.com
-AI4MS_PORTAL_URL=https://ai4ms.wumiaox.com   # 用于"前往注册"外链
+AI4MS_BASE_URL=https://ai4ms.xmuzc.com
+AI4MS_PORTAL_URL=https://ai4ms.xmuzc.com   # 用于"前往注册"外链
 
 # ===== WeKnora 对接 =====
-WEKNORA_BASE_URL=https://weknora.wumiaox.com
+WEKNORA_BASE_URL=https://weknora.xmuzc.com
 WEKNORA_API_KEY=<Scoped API Key with ingest + retrieve>
 
 # ===== 上传限制 =====
@@ -521,7 +521,7 @@ KB_LIST_CACHE_TTL=300
 SQLITE_PATH=data/ragportal.db
 
 # ===== CORS(开发期)=====
-FRONTEND_ORIGIN=https://rag.wumiaox.com
+FRONTEND_ORIGIN=https://rag.xmuzc.com
 
 # ===== 部署 =====
 APP_ENV=production                  # production / development
@@ -541,7 +541,7 @@ LOG_LEVEL=INFO
   icon: '📚',
   accentColor: '#2563eb',
   accentTextClass: 'var(--accent-blue-text)',
-  url: 'https://rag.wumiaox.com',
+  url: 'https://rag.xmuzc.com',
 }
 ```
 
@@ -586,7 +586,7 @@ module.exports = {
 }
 ```
 
-反代(Nginx)将 `rag.wumiaox.com` → 前端静态文件 + `/api/*` → 后端 8002。
+反代(Nginx)将 `rag.xmuzc.com` → 前端静态文件 + `/api/*` → 后端 8002。
 
 ## 15. 不在范围内(YAGNI)
 

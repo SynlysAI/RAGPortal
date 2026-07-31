@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 3002,
     proxy: {
-      '/api': 'http://127.0.0.1:8002',
+      '/api': 'http://127.0.0.1:8004',
     },
   },
 })

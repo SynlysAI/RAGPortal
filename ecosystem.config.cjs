@@ -4,7 +4,7 @@ module.exports = {
     {
       name: 'ragportal',
       script: 'C:/conda_envs/ragportal/Scripts/uvicorn.exe',
-      args: 'app.main:app --host 127.0.0.1 --port 8002',
+      args: 'app.main:app --host 127.0.0.1 --port 8004',
       cwd: __dirname + '/backend',
       env: {
         APP_ENV: 'production',

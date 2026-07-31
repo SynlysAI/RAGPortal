@@ -24,6 +24,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 }
 
 export const router = createBrowserRouter([
+  { path: '/', element: <Navigate to="/upload" replace /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/sso', element: <SsoPage /> },
   {

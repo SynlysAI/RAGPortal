@@ -35,6 +35,21 @@ def _safe_json(resp: httpx.Response) -> dict:
         return {"raw": resp.text}
 
 
+def _extract_response_data(payload: dict) -> dict[str, Any]:
+    """从 WeKnora 标准响应中提取 data 对象。
+
+    Args:
+        payload: WeKnora API 返回的完整 JSON 字典。
+
+    Returns:
+        响应中的 data 字典；旧格式或非字典 data 时回退为原始响应。
+    """
+    data = payload.get("data")
+    if isinstance(data, dict):
+        return data
+    return payload
+
+
 async def list_knowledge_bases() -> list[dict[str, Any]]:
     """获取当前 API Key 能访问的所有知识库。
 
@@ -101,7 +116,7 @@ async def upload_file(
     }
     data: dict[str, Any] = {"metadata": _json.dumps(metadata)}
     if custom_filename:
-        data["customFileName"] = custom_filename
+        data["fileName"] = custom_filename
     files = {"file": (file_name, file_bytes)}
 
     async with _client() as c:
@@ -116,4 +131,4 @@ async def upload_file(
             _safe_json(resp).get("detail", "上传失败"),
             _safe_json(resp),
         )
-    return _safe_json(resp)
+    return _extract_response_data(_safe_json(resp))

@@ -14,7 +14,10 @@ async def test_upload_file_injects_uploader_metadata(monkeypatch):
         status_code = 200
 
         def json(self):
-            return {"id": "k-1", "parse_status": "pending"}
+            return {
+                "data": {"id": "k-1", "parse_status": "processing"},
+                "success": True,
+            }
 
     async def fake_post(self, url, **kwargs):
         captured["url"] = url
@@ -42,7 +45,7 @@ async def test_upload_file_injects_uploader_metadata(monkeypatch):
     assert meta["uploader_id"] == "u1"
     assert meta["uploader_name"] == "alice"
     assert meta["uploader_org"] == "R&D"
-    assert captured["data"].get("customFileName") == "sub/report.pdf"
+    assert captured["data"].get("fileName") == "sub/report.pdf"
     assert captured["files"]["file"][0] == "report.pdf"
     # files 第二项可能是 bytes 或 file-like
     file_obj = captured["files"]["file"][1]

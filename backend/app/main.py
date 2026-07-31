@@ -50,7 +50,10 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
-# 生产环境:挂载前端静态文件(须在所有 API 路由之后)
-_frontend_dist = os.environ.get("FRONTEND_DIST", "../frontend/dist")
-if os.path.isdir(_frontend_dist):
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
+# 仅生产环境挂载前端静态文件(开发环境由 Vite dev server 提供)。
+# 否则 StaticFiles(html=True) 会拦截非 GET 请求导致 405。
+_settings = get_settings()
+if _settings.app_env == "production":
+    _frontend_dist = os.environ.get("FRONTEND_DIST", "../frontend/dist")
+    if os.path.isdir(_frontend_dist):
+        app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")

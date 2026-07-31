@@ -95,11 +95,11 @@ AUTH_SECRET=replace_with_ai4ms_auth_secret
 AUTH_TOKEN_EXPIRE_HOURS=24
 
 # ===== AI4MS 门户对接 =====
-AI4MS_BASE_URL=https://ai4ms.wumiaox.com
-AI4MS_PORTAL_URL=https://ai4ms.wumiaox.com
+AI4MS_BASE_URL=https://ai4ms.xmuzc.com
+AI4MS_PORTAL_URL=https://ai4ms.xmuzc.com
 
 # ===== WeKnora 对接 =====
-WEKNORA_BASE_URL=https://weknora.wumiaox.com
+WEKNORA_BASE_URL=https://weknora.xmuzc.com
 WEKNORA_API_KEY=replace_with_scoped_api_key
 
 # ===== 上传限制 =====
@@ -3733,7 +3733,7 @@ pm2 save
 ```nginx
 server {
     listen 80;
-    server_name rag.wumiaox.com;
+    server_name rag.xmuzc.com;
     location / {
         proxy_pass http://127.0.0.1:8002;
         proxy_set_header Host $host;

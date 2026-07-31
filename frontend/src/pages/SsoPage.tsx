@@ -1,29 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { authApi } from '@/api/auth'
-import { setToken } from '@/api/client'
+import { clearToken, consumeTokenFromHash, getToken } from '@/api/client'
+import { useAuthStore } from '@/stores/authStore'
 
 export default function SsoPage() {
   const navigate = useNavigate()
   const [status, setStatus] = useState('正在验证登录令牌...')
 
   useEffect(() => {
-    const hash = window.location.hash || ''
-    const match = hash.match(/[#&]token=([^&]+)/)
-    if (!match) {
+    consumeTokenFromHash()
+    if (!getToken()) {
       setStatus('未检测到 SSO 令牌,即将跳转到登录页...')
       setTimeout(() => navigate('/login', { replace: true }), 1500)
       return
     }
-    const token = decodeURIComponent(match[1])
-    setToken(token)
 
-    authApi.me()
+    useAuthStore.getState().initialize()
       .then(() => {
-        window.history.replaceState(null, '', '/upload')
-        window.location.reload()
+        if (useAuthStore.getState().isAuthenticated) {
+          navigate('/upload', { replace: true })
+          return
+        }
+        clearToken()
+        setStatus('令牌无效或已过期,即将跳转到登录页...')
+        setTimeout(() => navigate('/login', { replace: true }), 2000)
       })
       .catch(() => {
+        clearToken()
         setStatus('令牌无效或已过期,即将跳转到登录页...')
         setTimeout(() => navigate('/login', { replace: true }), 2000)
       })

@@ -106,7 +106,7 @@ export default function DashboardPage() {
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={kbs} dataKey="count" nameKey="kb_name" cx="50%" cy="50%" outerRadius={90} label={({ kb_name, count }) => `${kb_name} (${count})`}>
+              <Pie data={kbs} dataKey="count" nameKey="kb_name" cx="50%" cy="50%" outerRadius={90} label={({ name, value }: any) => `${name} (${value})`}>
                 {kbs.map((_, i) => (
                   <PieCell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
