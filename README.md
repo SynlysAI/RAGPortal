@@ -17,18 +17,61 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 ```bash
 # 后端
 cd backend
-python -m venv venv
-source venv/Scripts/activate    # Windows Git Bash; PowerShell 用 venv\Scripts\activate
+conda activate ragportal
 pip install -r requirements.txt
 cp ../.env.example ../.env      # 修改其中的密钥与域名
 uvicorn app.main:app --reload --port 8002
 
-# 前端
+# 前端(另开终端)
 cd frontend
 npm install
-npm run dev                     # 默认 3002 端口,自动代理 /api 到后端
+npm run dev                     # 默认 3002 端口,自动代理 /api → 后端
 ```
 
 ## 部署
 
-详见 [README 部署章节](README.md#部署) (Task 18 完成后补充)。
+```bash
+# 1. 安装依赖
+cd backend && conda activate ragportal && pip install -r requirements.txt && cd ..
+cd frontend && npm install && npm run build && cd ..
+
+# 2. 配置 .env(含 AUTH_SECRET / WEKNORA_API_KEY / 域名)
+cp .env.example .env && vim .env
+
+# 3. 启动(pm2)
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+## Nginx 反向代理(示例)
+
+```nginx
+server {
+    listen 80;
+    server_name rag.wumiaox.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        client_max_body_size 100M;
+    }
+}
+```
+
+## AI4MS 门户接入(可选)
+
+在 AI4MS `frontend/src/pages/HomePage.tsx` 的 `APPS` 数组追加:
+
+```ts
+{
+  name: 'RAG 知识库',
+  description: ['文档上传', '知识库管理'],
+  icon: '📚',
+  accentColor: '#2563eb',
+  accentTextClass: 'var(--accent-blue-text)',
+  url: 'https://rag.wumiaox.com',
+}
+```
+
+AppCard 会自动通过 `window.open(url#token=xxx)` 把 AI4MS token 通过 hash 传给 RAGPortal,实现 SSO。
