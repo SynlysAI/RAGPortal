@@ -27,6 +27,18 @@ export interface BackfillResult {
   skipped: number
 }
 
+export interface UploaderRankItem {
+  user_id: string
+  username: string
+  count: number
+}
+
+export interface KbRankItem {
+  kb_id: string
+  kb_name: string
+  count: number
+}
+
 export const adminApi = {
   async list(params: AdminListParams): Promise<{ items: UploadRecord[]; total: number }> {
     const resp = await api.get('/admin/uploads', { params })
@@ -56,11 +68,19 @@ export const adminApi = {
     const resp = await api.get('/admin/stats/daily-trend', { params: { days } })
     return resp.data
   },
-  async topUploaders(n = 5): Promise<{ items: { user_id: string; username: string; count: number }[] }> {
+  async topUploaders(n = 5): Promise<{ items: UploaderRankItem[] }> {
     const resp = await api.get('/admin/stats/top-uploaders', { params: { n } })
     return resp.data
   },
-  async kbDistribution(): Promise<{ items: { kb_id: string; kb_name: string; count: number }[] }> {
+  async userKbDistribution(userId: string): Promise<{ items: KbRankItem[] }> {
+    const resp = await api.get('/admin/stats/user-kb-distribution', { params: { user_id: userId } })
+    return resp.data
+  },
+  async kbUploaders(kbId: string, n = 50): Promise<{ items: UploaderRankItem[] }> {
+    const resp = await api.get('/admin/stats/kb-uploaders', { params: { kb_id: kbId, n } })
+    return resp.data
+  },
+  async kbDistribution(): Promise<{ items: KbRankItem[] }> {
     const resp = await api.get('/admin/stats/kb-distribution')
     return resp.data
   },

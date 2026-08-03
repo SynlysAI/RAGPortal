@@ -263,6 +263,65 @@ async def stats_top_uploaders(
     return {"items": [{"user_id": r[0], "username": r[1], "count": r[2]} for r in rows]}
 
 
+@router.get("/stats/user-kb-distribution")
+async def stats_user_kb_distribution(
+    user_id: str = Query(..., min_length=1),
+    admin: UserInfo = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """指定上传者在各知识库的上传分布。
+
+    Args:
+        user_id: 上传者 user_id。
+        admin: 当前管理员用户。
+        session: 数据库会话。
+
+    Returns:
+        知识库上传数量排行。
+    """
+    stmt = (
+        select(Upload.kb_id, Upload.kb_name, func.count(Upload.id).label("cnt"))
+        .where(Upload.uploader_user_id == user_id)
+        .group_by(Upload.kb_id, Upload.kb_name)
+        .order_by(func.count(Upload.id).desc())
+    )
+    rows = (await session.execute(stmt)).all()
+    return {"items": [{"kb_id": r[0], "kb_name": r[1], "count": r[2]} for r in rows]}
+
+
+@router.get("/stats/kb-uploaders")
+async def stats_kb_uploaders(
+    kb_id: str = Query(..., min_length=1),
+    n: int = Query(50, ge=1, le=200),
+    admin: UserInfo = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """指定知识库下的上传者排行。
+
+    Args:
+        kb_id: 知识库 ID。
+        n: 返回排行数量。
+        admin: 当前管理员用户。
+        session: 数据库会话。
+
+    Returns:
+        上传者上传数量排行。
+    """
+    stmt = (
+        select(
+            Upload.uploader_user_id,
+            Upload.uploader_username,
+            func.count(Upload.id).label("cnt"),
+        )
+        .where(Upload.kb_id == kb_id)
+        .group_by(Upload.uploader_user_id, Upload.uploader_username)
+        .order_by(func.count(Upload.id).desc())
+        .limit(n)
+    )
+    rows = (await session.execute(stmt)).all()
+    return {"items": [{"user_id": r[0], "username": r[1], "count": r[2]} for r in rows]}
+
+
 @router.get("/stats/kb-distribution")
 async def stats_kb_distribution(
     admin: UserInfo = Depends(get_current_admin),
