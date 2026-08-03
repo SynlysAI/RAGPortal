@@ -1,7 +1,7 @@
 """上传与个人历史路由。"""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from app.api.v1.auth import get_current_user, UserInfo
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.models.upload import Upload
+from app.services.ai4ms_user_service import find_ai4ms_user
 from app.services.sync_service import sync_one, sync_pending
 from app.services.upload_service import UploadError, handle_upload
 
@@ -34,23 +35,66 @@ def _to_dict(u: Upload) -> dict:
     }
 
 
+async def _resolve_upload_user(
+    *,
+    request: Request,
+    current_user: UserInfo,
+    uploader_user_id: Optional[str],
+) -> UserInfo:
+    """解析本次上传应归属的用户。
+
+    Args:
+        request: 当前请求对象，用于透传 Authorization。
+        current_user: 当前登录用户。
+        uploader_user_id: 管理员指定的上传者 user_id。
+
+    Returns:
+        本次上传记录应使用的上传者信息。
+
+    Raises:
+        HTTPException: 非管理员指定上传者，或目标用户不存在。
+    """
+    target_user_id = (uploader_user_id or "").strip()
+    if not target_user_id:
+        return current_user
+    if target_user_id == current_user.user_id:
+        return current_user
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可以指定上传者")
+
+    target_user = await find_ai4ms_user(
+        request.headers.get("Authorization", ""),
+        target_user_id,
+    )
+    if target_user is None:
+        raise HTTPException(status_code=400, detail="指定上传者不存在")
+    return target_user
+
+
 @router.post("")
 async def upload(
+    request: Request,
     file: UploadFile = File(...),
     kb_id: str = Form(...),
+    uploader_user_id: Optional[str] = Form(None),
     user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """上传单个文件到指定 KB。"""
     settings = get_settings()
+    upload_user = await _resolve_upload_user(
+        request=request,
+        current_user=user,
+        uploader_user_id=uploader_user_id,
+    )
     try:
         record = await handle_upload(
             session=session,
             kb_id=kb_id,
             file=file,
-            uploader_user_id=user.user_id,
-            uploader_username=user.username,
-            uploader_organization=user.organization,
+            uploader_user_id=upload_user.user_id,
+            uploader_username=upload_user.username,
+            uploader_organization=upload_user.organization,
             max_size_bytes=settings.upload_max_size_mb * 1024 * 1024,
             allowed_types=settings.allowed_file_types_set,
         )

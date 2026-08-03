@@ -17,10 +17,18 @@ export interface UploadRecord {
 }
 
 export const uploadsApi = {
-  async upload(file: File, kbId: string, onProgress?: (pct: number) => void): Promise<UploadRecord> {
+  async upload(
+    file: File,
+    kbId: string,
+    uploaderUserId?: string,
+    onProgress?: (pct: number) => void,
+  ): Promise<UploadRecord> {
     const form = new FormData()
     form.append('file', file)
     form.append('kb_id', kbId)
+    if (uploaderUserId) {
+      form.append('uploader_user_id', uploaderUserId)
+    }
     const resp = await api.post('/uploads', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {

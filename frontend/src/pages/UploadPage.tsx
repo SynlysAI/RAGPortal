@@ -2,19 +2,47 @@ import { useEffect, useState } from 'react'
 import KbSelector from '@/components/KbSelector'
 import UploadDropzone from '@/components/UploadDropzone'
 import { useUploadStore } from '@/stores/uploadStore'
+import { useAuthStore } from '@/stores/authStore'
+import { adminApi, type AdminUserInfo } from '@/api/admin'
 import { authApi } from '@/api/auth'
 import { formatFileSize } from '@/utils/format'
 
 export default function UploadPage() {
   const [kbId, setKbId] = useState('')
+  const [selectedUploaderId, setSelectedUploaderId] = useState('')
+  const [users, setUsers] = useState<AdminUserInfo[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState('')
   const [config, setConfig] = useState<{ max_size_mb: number; allowed_file_types: string[] } | null>(null)
   const { items, addFiles, clearCompleted } = useUploadStore()
+  const user = useAuthStore((state) => state.user)
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     authApi.getConfig().then((c) => {
       setConfig({ max_size_mb: c.max_size_mb, allowed_file_types: c.allowed_file_types })
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedUploaderId('')
+      setUsers([])
+      setUsersError('')
+      return
+    }
+    setSelectedUploaderId(user?.user_id || '')
+    setUsersLoading(true)
+    setUsersError('')
+    adminApi.listUsers()
+      .then((items) => {
+        setUsers(items.filter((item) => item.status !== 'disabled'))
+      })
+      .catch((err) => {
+        setUsersError(err.response?.data?.detail || err.message || '用户列表加载失败')
+      })
+      .finally(() => setUsersLoading(false))
+  }, [isAdmin, user?.user_id])
 
   const completed = items.filter((it) => it.status === 'success' || it.status === 'failed').length
   const totalProgress = items.length > 0 ? Math.round((completed / items.length) * 100) : 0
@@ -24,14 +52,41 @@ export default function UploadPage() {
       alert('请先选择知识库')
       return
     }
-    addFiles(files, kbId)
+    const uploaderUserId =
+      isAdmin && selectedUploaderId !== user?.user_id ? selectedUploaderId : undefined
+    addFiles(files, kbId, uploaderUserId)
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-slate-700">上传到:</span>
-        <KbSelector value={kbId} onChange={setKbId} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-700">上传到:</span>
+          <KbSelector value={kbId} onChange={setKbId} />
+        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-700">上传者:</span>
+            <select
+              value={selectedUploaderId}
+              onChange={(e) => setSelectedUploaderId(e.target.value)}
+              disabled={usersLoading || users.length === 0}
+              title={usersError || undefined}
+              className="px-3 py-2 border border-slate-300 rounded-md bg-white text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent disabled:bg-slate-100 disabled:text-slate-500"
+            >
+              <option value={user?.user_id || ''}>
+                {user?.username || '当前管理员'}
+              </option>
+              {users
+                .filter((item) => item.user_id !== user?.user_id)
+                .map((item) => (
+                  <option key={item.user_id} value={item.user_id}>
+                    {item.username}{item.organization ? ` - ${item.organization}` : ''}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {config && (
@@ -88,11 +143,6 @@ export default function UploadPage() {
                         />
                       </div>
                     )}
-                    {it.status === 'failed' && it.error && (
-                      <div className="text-xs text-red-600 mt-0.5 truncate" title={it.error}>
-                        {it.error}
-                      </div>
-                    )}
                   </div>
 
                   {/* 文件大小 */}
@@ -106,7 +156,12 @@ export default function UploadPage() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">完成</span>
                     )}
                     {it.status === 'failed' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">失败</span>
+                      <span
+                        title={it.error || undefined}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700"
+                      >
+                        失败
+                      </span>
                     )}
                     {it.status === 'uploading' && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">{it.progress}%</span>

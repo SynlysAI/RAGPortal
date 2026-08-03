@@ -4,7 +4,7 @@ import io
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,10 +12,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth import get_current_admin, UserInfo
 from app.core.db import get_session
 from app.models.upload import Upload
+from app.services.ai4ms_user_service import list_ai4ms_users
 from app.services.backfill_service import backfill_uploads_from_weknora
 from app.services.sync_service import sync_pending
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _user_to_dict(user: UserInfo) -> dict:
+    """序列化用户信息。
+
+    Args:
+        user: 用户信息对象。
+
+    Returns:
+        前端可读的用户字典。
+    """
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "role": user.role,
+        "status": user.status,
+        "organization": user.organization,
+    }
 
 
 def _to_admin_dict(u: Upload) -> dict:
@@ -35,6 +54,24 @@ def _to_admin_dict(u: Upload) -> dict:
         "parse_error": u.parse_error,
         "uploaded_at": u.uploaded_at,
     }
+
+
+@router.get("/users")
+async def list_users(
+    request: Request,
+    admin: UserInfo = Depends(get_current_admin),
+) -> list[dict]:
+    """代理获取 AI4MS 用户列表。
+
+    Args:
+        request: 当前请求对象，用于透传 Authorization。
+        admin: 当前管理员用户。
+
+    Returns:
+        AI4MS 用户列表。
+    """
+    users = await list_ai4ms_users(request.headers.get("Authorization", ""))
+    return [_user_to_dict(user) for user in users]
 
 
 def _apply_filters(

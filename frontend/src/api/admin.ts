@@ -1,6 +1,14 @@
 import { api } from './client'
 import type { UploadRecord } from './uploads'
 
+export interface AdminUserInfo {
+  user_id: string
+  username: string
+  role: 'admin' | 'user'
+  status: string
+  organization: string
+}
+
 export interface AdminListParams {
   page?: number
   page_size?: number
@@ -34,6 +42,10 @@ export const adminApi = {
   },
   async backfillUploads(pageSize = 100): Promise<BackfillResult> {
     const resp = await api.post('/admin/uploads/backfill', null, { params: { page_size: pageSize } })
+    return resp.data
+  },
+  async listUsers(): Promise<AdminUserInfo[]> {
+    const resp = await api.get('/admin/users')
     return resp.data
   },
   async overview(): Promise<{ total: number; week_count: number; failed: number; active_users_7d: number }> {
