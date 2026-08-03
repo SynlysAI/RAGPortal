@@ -9,7 +9,7 @@ from app.api.v1.auth import get_current_user, UserInfo
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.models.upload import Upload
-from app.services.sync_service import sync_one
+from app.services.sync_service import sync_one, sync_pending
 from app.services.upload_service import UploadError, handle_upload
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
@@ -66,7 +66,12 @@ async def list_my_uploads(
     user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """当前用户上传记录(按上传时间倒序)。"""
+    """当前用户上传记录(按上传时间倒序)。
+
+    每次拉取列表前先懒同步最近的 pending/processing 记录，
+    让页面尽量展示 WeKnora 的最新解析状态。
+    """
+    await sync_pending(session)
     offset = (page - 1) * page_size
     stmt = (
         select(Upload)

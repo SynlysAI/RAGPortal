@@ -9,12 +9,20 @@ const LABELS: Record<Status, { text: string; cls: string; icon: string }> = {
 
 interface Props {
   status: Status | string
+  tooltip?: string
 }
 
-export default function StatusBadge({ status }: Props) {
+export default function StatusBadge({ status, tooltip }: Props) {
   const cfg = LABELS[status as Status] || LABELS.pending
+  const title = status === 'failed' ? (tooltip || '上传失败') : undefined
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${
+        title ? 'cursor-help' : ''
+      } ${cfg.cls}`}
+      title={title}
+      aria-label={title}
+    >
       <span>{cfg.icon}</span>
       {cfg.text}
     </span>

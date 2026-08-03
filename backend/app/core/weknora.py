@@ -80,6 +80,47 @@ async def get_knowledge(knowledge_id: str) -> dict[str, Any]:
     return data.get("data") or data
 
 
+async def list_knowledge_page(
+    kb_id: str,
+    page: int = 1,
+    page_size: int = 100,
+) -> dict[str, Any]:
+    """分页获取指定知识库下的 knowledge 列表。
+
+    Args:
+        kb_id: 知识库 ID。
+        page: 页码，从 1 开始。
+        page_size: 每页条数。
+
+    Returns:
+        包含 items/page/page_size/total 的分页结果。
+
+    Raises:
+        WeknoraError: WeKnora 返回非 2xx。
+    """
+    async with _client() as c:
+        resp = await c.get(
+            f"/api/v1/knowledge-bases/{kb_id}/knowledge",
+            params={"page": page, "page_size": page_size},
+        )
+    payload = _safe_json(resp)
+    if resp.status_code != 200:
+        raise WeknoraError(
+            resp.status_code,
+            payload.get("detail") or payload.get("message") or "拉取知识列表失败",
+            payload,
+        )
+    items = payload.get("data") or payload.get("items") or []
+    if not isinstance(items, list):
+        items = []
+    return {
+        "items": items,
+        "page": payload.get("page", page),
+        "page_size": payload.get("page_size", page_size),
+        "total": payload.get("total", len(items)),
+    }
+
+
 async def upload_file(
     *,
     kb_id: str,

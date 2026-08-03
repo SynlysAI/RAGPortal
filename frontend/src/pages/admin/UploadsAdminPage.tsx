@@ -12,6 +12,7 @@ export default function UploadsAdminPage() {
   const [total, setTotal] = useState(0)
   const [kbs, setKbs] = useState<KbInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [backfilling, setBackfilling] = useState(false)
   const [filters, setFilters] = useState<AdminListParams>({
     page: 1,
     page_size: PAGE_SIZE,
@@ -57,18 +58,41 @@ export default function UploadsAdminPage() {
     setFilters({ ...filters })
   }
 
+  async function handleBackfill() {
+    if (!window.confirm('将从 WeKnora 扫描历史知识并回写到本地记录。缺失上传者会标记为“系统上传 / 来源未知”。是否继续?')) {
+      return
+    }
+    setBackfilling(true)
+    try {
+      const r = await adminApi.backfillUploads(100)
+      alert(`历史回写完成: 扫描 ${r.scanned} 条, 新增 ${r.created} 条, 更新 ${r.updated} 条, 跳过 ${r.skipped} 条`)
+      setFilters({ ...filters, page: 1 })
+    } finally {
+      setBackfilling(false)
+    }
+  }
+
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">全部上传记录</h2>
-        <button
-          onClick={handleSync}
-          className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors"
-        >
-          ↻ 刷新状态
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {backfilling ? '回写中...' : '历史回写'}
+          </button>
+          <button
+            onClick={handleSync}
+            className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors"
+          >
+            ↻ 刷新状态
+          </button>
+        </div>
       </div>
 
       {/* 筛选条 */}
@@ -156,12 +180,7 @@ export default function UploadsAdminPage() {
               <div className="truncate text-slate-600">{u.kb_name}</div>
               <div className="text-right text-slate-500 tabular-nums">{formatFileSize(u.file_size)}</div>
               <div className="text-center">
-                <StatusBadge status={u.parse_status} />
-                {u.parse_status === 'failed' && u.parse_error && (
-                  <div className="text-xs text-red-600 mt-1 truncate max-w-[120px]" title={u.parse_error}>
-                    {u.parse_error}
-                  </div>
-                )}
+                <StatusBadge status={u.parse_status} tooltip={u.parse_error} />
               </div>
               <div className="text-right text-slate-500 tabular-nums">{formatTime(u.uploaded_at)}</div>
             </div>

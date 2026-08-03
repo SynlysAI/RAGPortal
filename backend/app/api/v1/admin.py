@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth import get_current_admin, UserInfo
 from app.core.db import get_session
 from app.models.upload import Upload
+from app.services.backfill_service import backfill_uploads_from_weknora
 from app.services.sync_service import sync_pending
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -130,6 +131,31 @@ async def sync_status(
     """触发批量懒同步(对最近 N 条非终态记录)。"""
     n = await sync_pending(session, limit=limit)
     return {"synced": n}
+
+
+@router.post("/uploads/backfill")
+async def backfill_uploads(
+    page_size: int = Query(100, ge=1, le=200),
+    max_pages_per_kb: int = Query(100, ge=1, le=1000),
+    admin: UserInfo = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """从 WeKnora 历史知识回写本地上传记录。
+
+    Args:
+        page_size: 每页拉取数量。
+        max_pages_per_kb: 每个知识库最多扫描页数。
+        admin: 当前管理员用户。
+        session: 数据库会话。
+
+    Returns:
+        回写统计信息。
+    """
+    return await backfill_uploads_from_weknora(
+        session,
+        page_size=page_size,
+        max_pages_per_kb=max_pages_per_kb,
+    )
 
 
 @router.get("/stats/overview")

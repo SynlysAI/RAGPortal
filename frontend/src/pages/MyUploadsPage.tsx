@@ -51,12 +51,7 @@ export default function MyUploadsPage() {
               <div className="truncate text-slate-600">{u.kb_name}</div>
               <div className="text-right text-slate-500 tabular-nums">{formatFileSize(u.file_size)}</div>
               <div className="text-center">
-                <StatusBadge status={u.parse_status} />
-                {u.parse_status === 'failed' && u.parse_error && (
-                  <div className="text-xs text-red-600 mt-1 max-w-[120px] truncate mx-auto" title={u.parse_error}>
-                    {u.parse_error}
-                  </div>
-                )}
+                <StatusBadge status={u.parse_status} tooltip={u.parse_error} />
               </div>
               <div className="text-right text-slate-500 tabular-nums">{formatTime(u.uploaded_at)}</div>
             </div>

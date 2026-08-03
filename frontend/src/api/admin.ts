@@ -12,6 +12,13 @@ export interface AdminListParams {
   end?: string
 }
 
+export interface BackfillResult {
+  scanned: number
+  created: number
+  updated: number
+  skipped: number
+}
+
 export const adminApi = {
   async list(params: AdminListParams): Promise<{ items: UploadRecord[]; total: number }> {
     const resp = await api.get('/admin/uploads', { params })
@@ -23,6 +30,10 @@ export const adminApi = {
   },
   async syncStatus(limit = 50): Promise<{ synced: number }> {
     const resp = await api.post('/admin/uploads/sync-status', null, { params: { limit } })
+    return resp.data
+  },
+  async backfillUploads(pageSize = 100): Promise<BackfillResult> {
+    const resp = await api.post('/admin/uploads/backfill', null, { params: { page_size: pageSize } })
     return resp.data
   },
   async overview(): Promise<{ total: number; week_count: number; failed: number; active_users_7d: number }> {
