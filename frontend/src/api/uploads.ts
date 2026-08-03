@@ -11,7 +11,7 @@ export interface UploadRecord {
   file_name: string
   file_type: string
   file_size: number
-  parse_status: 'pending' | 'processing' | 'success' | 'failed'
+  parse_status: 'pending' | 'processing' | 'success' | 'failed' | 'deleted'
   parse_error: string
   uploaded_at: string
 }

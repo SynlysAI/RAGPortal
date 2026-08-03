@@ -86,6 +86,15 @@ interface DrawerRankItem {
   count: number
 }
 
+function rankBadgeClass(index: number) {
+  const classes = [
+    'bg-amber-100 text-amber-700',
+    'bg-blue-100 text-blue-700',
+    'bg-violet-100 text-violet-700',
+  ]
+  return classes[index] || 'bg-slate-100 text-slate-500'
+}
+
 function KpiCard({ label, value, hint, tone, icon }: KpiCardProps) {
   const styles = TONE_STYLES[tone]
 
@@ -173,9 +182,7 @@ function RankRows({
         const width = Math.round((item.count / maxCount) * 100)
         const content = (
           <>
-            <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-              index < 3 ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'
-            }`}>
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${rankBadgeClass(index)}`}>
               {index + 1}
             </span>
             <div className="min-w-0">
@@ -567,9 +574,7 @@ export default function DashboardPage() {
                       onClick={() => openUserKbDistribution(item)}
                       className="grid w-full grid-cols-[32px_1fr_auto] items-center gap-3 rounded-md py-1 text-left transition-colors hover:bg-slate-50"
                     >
-                      <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                        index < 3 ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'
-                      }`}>
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${rankBadgeClass(index)}`}>
                         {index + 1}
                       </span>
                       <div className="min-w-0">

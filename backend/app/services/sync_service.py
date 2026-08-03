@@ -4,8 +4,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.weknora import get_knowledge
+from app.core.weknora import WeknoraError, get_knowledge
 from app.models.upload import Upload
+
+DELETED_STATUS = "deleted"
+DELETED_ERROR = "上游文档已删除"
 
 
 def _map_status(weknora_status: str) -> tuple[str, str]:
@@ -40,9 +43,18 @@ async def sync_one(session: AsyncSession, upload: Upload) -> Upload:
     Returns:
         更新后的 Upload 对象。
     """
-    if upload.parse_status in ("success", "failed"):
+    if upload.parse_status in ("success", "failed", DELETED_STATUS):
         return upload
-    data = await get_knowledge(upload.knowledge_id)
+    try:
+        data = await get_knowledge(upload.knowledge_id)
+    except WeknoraError as exc:
+        if exc.status != 404:
+            raise
+        upload.parse_status = DELETED_STATUS
+        upload.parse_error = DELETED_ERROR
+        upload.last_synced_at = datetime.now(timezone.utc).isoformat()
+        await session.commit()
+        return upload
     weknora_status = data.get("parse_status", "")
     new_status, _ = _map_status(weknora_status)
     error_msg = ""

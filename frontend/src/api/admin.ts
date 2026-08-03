@@ -25,6 +25,7 @@ export interface BackfillResult {
   created: number
   updated: number
   skipped: number
+  deleted?: number
 }
 
 export interface UploaderRankItem {

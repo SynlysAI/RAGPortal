@@ -15,6 +15,8 @@ from app.services.sync_service import _map_status
 SYSTEM_USER_ID = "system"
 SYSTEM_USERNAME = "系统上传"
 UNKNOWN_SOURCE = "来源未知"
+DELETED_STATUS = "deleted"
+DELETED_ERROR = "上游文档已删除"
 
 
 def _parse_metadata(raw: Any) -> dict[str, Any]:
@@ -196,6 +198,40 @@ async def _upsert_knowledge(
     return "created"
 
 
+async def _mark_missing_knowledge_deleted(
+    session: AsyncSession,
+    kb_id: str,
+    seen_knowledge_ids: set[str],
+) -> int:
+    """将 WeKnora 当前列表中缺失的本地记录标记为上游已删除。
+
+    Args:
+        session: 异步数据库会话。
+        kb_id: 知识库 ID。
+        seen_knowledge_ids: 本次完整扫描到的 WeKnora knowledge ID 集合。
+
+    Returns:
+        本次标记为 deleted 的记录数量。
+    """
+    stmt = select(Upload).where(
+        Upload.kb_id == kb_id,
+        Upload.parse_status != DELETED_STATUS,
+    )
+    result = await session.execute(stmt)
+    now = datetime.now(timezone.utc).isoformat()
+    deleted = 0
+    for record in result.scalars().all():
+        if record.knowledge_id in seen_knowledge_ids:
+            continue
+        record.parse_status = DELETED_STATUS
+        record.parse_error = DELETED_ERROR
+        record.last_synced_at = now
+        deleted += 1
+    if deleted:
+        await session.commit()
+    return deleted
+
+
 async def backfill_uploads_from_weknora(
     session: AsyncSession,
     page_size: int = 100,
@@ -211,25 +247,39 @@ async def backfill_uploads_from_weknora(
     Returns:
         回写统计信息。
     """
-    stats = {"scanned": 0, "created": 0, "updated": 0, "skipped": 0}
+    stats = {"scanned": 0, "created": 0, "updated": 0, "skipped": 0, "deleted": 0}
     kbs = await get_kb_list(refresh=True)
     for kb in kbs:
         kb_id = str(kb.get("id") or "").strip()
         if not kb_id:
             continue
+        seen_knowledge_ids: set[str] = set()
+        fully_scanned = False
         for page in range(1, max_pages_per_kb + 1):
             data = await list_knowledge_page(kb_id, page=page, page_size=page_size)
             items = data["items"]
             if not items:
+                fully_scanned = True
                 break
             for knowledge in items:
+                knowledge_id = str(knowledge.get("id") or "").strip()
+                if knowledge_id:
+                    seen_knowledge_ids.add(knowledge_id)
                 stats["scanned"] += 1
                 action = await _upsert_knowledge(session, kb, knowledge)
                 stats[action] += 1
             await session.commit()
             total = int(data.get("total") or 0)
             if total and page * page_size >= total:
+                fully_scanned = True
                 break
             if len(items) < page_size:
+                fully_scanned = True
                 break
+        if fully_scanned:
+            stats["deleted"] += await _mark_missing_knowledge_deleted(
+                session,
+                kb_id,
+                seen_knowledge_ids,
+            )
     return stats

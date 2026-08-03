@@ -65,7 +65,7 @@ export default function UploadsAdminPage() {
     setBackfilling(true)
     try {
       const r = await adminApi.backfillUploads(100)
-      alert(`历史回写完成: 扫描 ${r.scanned} 条, 新增 ${r.created} 条, 更新 ${r.updated} 条, 跳过 ${r.skipped} 条`)
+      alert(`历史回写完成: 扫描 ${r.scanned} 条, 新增 ${r.created} 条, 更新 ${r.updated} 条, 标记上游已删除 ${r.deleted || 0} 条, 跳过 ${r.skipped} 条`)
       setFilters({ ...filters, page: 1 })
     } finally {
       setBackfilling(false)
@@ -121,6 +121,7 @@ export default function UploadsAdminPage() {
           <option value="processing">处理中</option>
           <option value="success">成功</option>
           <option value="failed">失败</option>
+          <option value="deleted">上游已删除</option>
         </select>
         <input
           type="date"
