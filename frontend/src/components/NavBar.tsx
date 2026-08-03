@@ -41,9 +41,11 @@ export default function NavBar() {
                   后台 <span className="text-xs">▾</span>
                 </button>
                 {adminMenuOpen && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg py-1 min-w-[140px] z-50">
-                    <Link to="/admin/dashboard" className="block px-3 py-2 text-sm hover:bg-slate-50">仪表盘</Link>
-                    <Link to="/admin/uploads" className="block px-3 py-2 text-sm hover:bg-slate-50">上传记录</Link>
+                  <div className="absolute left-0 top-full z-50 min-w-[140px] pt-1">
+                    <div className="rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                      <Link to="/admin/dashboard" className="block px-3 py-2 text-sm hover:bg-slate-50">仪表盘</Link>
+                      <Link to="/admin/uploads" className="block px-3 py-2 text-sm hover:bg-slate-50">上传记录</Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -65,17 +67,19 @@ export default function NavBar() {
                 <span className="text-xs text-slate-400">▾</span>
               </button>
               {userMenuOpen && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg py-1 min-w-[200px] z-50">
-                  <div className="px-4 py-2.5 border-b border-slate-100">
-                    <div className="text-sm font-semibold text-slate-800">{user.username}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{user.organization || '—'}</div>
+                <div className="absolute right-0 top-full z-50 min-w-[200px] pt-1">
+                  <div className="rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                    <div className="border-b border-slate-100 px-4 py-2.5">
+                      <div className="text-sm font-semibold text-slate-800">{user.username}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{user.organization || '—'}</div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      退出登录
+                    </button>
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    退出登录
-                  </button>
                 </div>
               )}
             </>
