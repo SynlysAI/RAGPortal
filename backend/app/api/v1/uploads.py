@@ -29,6 +29,7 @@ def _to_dict(u: Upload) -> dict:
         "file_name": u.file_name,
         "file_type": u.file_type,
         "file_size": u.file_size,
+        "file_hash": u.file_hash,
         "parse_status": u.parse_status,
         "parse_error": u.parse_error,
         "uploaded_at": u.uploaded_at,

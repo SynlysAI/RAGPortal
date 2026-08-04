@@ -1,6 +1,7 @@
 """数据库连接与初始化。"""
 from pathlib import Path
 
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
@@ -26,10 +27,31 @@ engine = create_async_engine(_build_url(), echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+def _migrate_uploads_table(sync_conn) -> None:
+    """补齐 uploads 表的历史列与索引。
+
+    Args:
+        sync_conn: SQLAlchemy 同步连接。
+    """
+    inspector = inspect(sync_conn)
+    try:
+        columns = {column["name"] for column in inspector.get_columns("uploads")}
+    except Exception:
+        columns = set()
+    if "file_hash" not in columns:
+        sync_conn.execute(
+            text(
+                "ALTER TABLE uploads ADD COLUMN file_hash VARCHAR(64) NOT NULL DEFAULT ''"
+            )
+        )
+    sync_conn.execute(text("CREATE INDEX IF NOT EXISTS idx_uploads_kb_hash ON uploads (kb_id, file_hash)"))
+
+
 async def init_db() -> None:
     """启动时建表。"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_uploads_table)
 
 
 async def get_session() -> AsyncSession:

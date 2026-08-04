@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.auth import get_current_admin, UserInfo
+from app.api.v1.auth import get_current_admin, get_current_user, UserInfo
 from app.core.db import get_session
 from app.models.upload import Upload
 from app.services.ai4ms_user_service import list_ai4ms_users
@@ -50,6 +50,7 @@ def _to_admin_dict(u: Upload) -> dict:
         "file_name": u.file_name,
         "file_type": u.file_type,
         "file_size": u.file_size,
+        "file_hash": u.file_hash,
         "parse_status": u.parse_status,
         "parse_error": u.parse_error,
         "uploaded_at": u.uploaded_at,
@@ -109,10 +110,10 @@ async def list_uploads(
     filename: Optional[str] = Query(None),
     start: Optional[str] = Query(None),
     end: Optional[str] = Query(None),
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """全部上传记录(支持筛选与分页)。"""
+    """全部上传记录只读列表(支持筛选与分页)。"""
     base = _apply_filters(select(Upload), uploader, kb_id, status, filename, start, end)
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await session.execute(count_stmt)).scalar_one()
@@ -197,7 +198,7 @@ async def backfill_uploads(
 
 @router.get("/stats/overview")
 async def stats_overview(
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """仪表盘 KPI。"""
@@ -224,7 +225,7 @@ async def stats_overview(
 @router.get("/stats/daily-trend")
 async def stats_daily_trend(
     days: int = Query(30, ge=1, le=365),
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """近 N 天每日上传量。"""
@@ -245,7 +246,7 @@ async def stats_daily_trend(
 @router.get("/stats/top-uploaders")
 async def stats_top_uploaders(
     n: int = Query(5, ge=1, le=50),
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Top N 上传者。"""
@@ -266,14 +267,14 @@ async def stats_top_uploaders(
 @router.get("/stats/user-kb-distribution")
 async def stats_user_kb_distribution(
     user_id: str = Query(..., min_length=1),
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """指定上传者在各知识库的上传分布。
 
     Args:
         user_id: 上传者 user_id。
-        admin: 当前管理员用户。
+        user: 当前登录用户。
         session: 数据库会话。
 
     Returns:
@@ -293,7 +294,7 @@ async def stats_user_kb_distribution(
 async def stats_kb_uploaders(
     kb_id: str = Query(..., min_length=1),
     n: int = Query(50, ge=1, le=200),
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """指定知识库下的上传者排行。
@@ -301,7 +302,7 @@ async def stats_kb_uploaders(
     Args:
         kb_id: 知识库 ID。
         n: 返回排行数量。
-        admin: 当前管理员用户。
+        user: 当前登录用户。
         session: 数据库会话。
 
     Returns:
@@ -324,7 +325,7 @@ async def stats_kb_uploaders(
 
 @router.get("/stats/kb-distribution")
 async def stats_kb_distribution(
-    admin: UserInfo = Depends(get_current_admin),
+    user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """各 KB 上传分布。"""

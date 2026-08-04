@@ -102,6 +102,11 @@ def _knowledge_file_type(knowledge: dict[str, Any], file_name: str) -> str:
     return str(knowledge.get("type") or "unknown")[:16]
 
 
+def _knowledge_file_hash(knowledge: dict[str, Any]) -> str:
+    """从 knowledge 对象中提取文件哈希。"""
+    return str(knowledge.get("file_hash") or "").strip()
+
+
 def _knowledge_uploaded_at(knowledge: dict[str, Any]) -> str:
     """从 knowledge 对象中推断上传时间。
 
@@ -153,6 +158,7 @@ async def _upsert_knowledge(
 
     file_name = _knowledge_file_name(knowledge)
     file_type = _knowledge_file_type(knowledge, file_name)
+    file_hash = _knowledge_file_hash(knowledge)
     parse_status, parse_error = _status_and_error(knowledge)
     metadata = _parse_metadata(knowledge.get("metadata"))
     uploader = _extract_uploader(metadata)
@@ -168,6 +174,8 @@ async def _upsert_knowledge(
         record.file_name = file_name
         record.file_type = file_type
         record.file_size = int(knowledge.get("file_size") or record.file_size or 0)
+        if file_hash:
+            record.file_hash = file_hash
         record.parse_status = parse_status
         record.parse_error = parse_error
         record.last_synced_at = now
@@ -188,6 +196,7 @@ async def _upsert_knowledge(
             file_name=file_name,
             file_type=file_type,
             file_size=int(knowledge.get("file_size") or 0),
+            file_hash=file_hash,
             parse_status=parse_status,
             parse_error=parse_error,
             weknora_task_id=str(knowledge.get("task_id") or ""),

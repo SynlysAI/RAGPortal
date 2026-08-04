@@ -53,6 +53,7 @@ def test_my_uploads_list_triggers_status_sync(monkeypatch):
         file_name="report.pdf",
         file_type="pdf",
         file_size=123,
+        file_hash="",
         parse_status="pending",
         parse_error="",
         weknora_task_id="",

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { uploadsApi } from '@/api/uploads'
 import { filterValidFiles } from '@/utils/fileFilter'
 
-type UploadItemStatus = 'pending' | 'uploading' | 'success' | 'failed'
+type UploadItemStatus = 'pending' | 'uploading' | 'success' | 'failed' | 'duplicate'
 
 export interface UploadItem {
   id: string
@@ -50,7 +50,11 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   },
 
   clearCompleted: () => {
-    set({ items: get().items.filter((it) => it.status !== 'success' && it.status !== 'failed') })
+    set({
+      items: get().items.filter(
+        (it) => it.status !== 'success' && it.status !== 'failed' && it.status !== 'duplicate',
+      ),
+    })
   },
 }))
 
@@ -73,7 +77,11 @@ async function startUpload(id: string, set: any, get: any) {
     update({ status: 'success', progress: 100, result: result as any })
   } catch (err: any) {
     const msg = err.response?.data?.detail || err.message || '上传失败'
-    update({ status: 'failed', error: msg })
+    if (err.response?.status === 409) {
+      update({ status: 'duplicate', error: msg })
+    } else {
+      update({ status: 'failed', error: msg })
+    }
   }
 
   // 启动下一条排队中的文件

@@ -81,6 +81,7 @@ async def handle_upload(
         file_name=file.filename or "untitled",
         file_type=ext,
         file_size=len(file_bytes),
+        file_hash=str(weknora_resp.get("file_hash") or "").strip(),
         parse_status="pending",
         parse_error="",
         weknora_task_id=weknora_resp.get("task_id", ""),

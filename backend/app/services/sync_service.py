@@ -60,8 +60,11 @@ async def sync_one(session: AsyncSession, upload: Upload) -> Upload:
     error_msg = ""
     if new_status == "failed":
         error_msg = data.get("error_message", "") or data.get("error", "")
+    file_hash = str(data.get("file_hash") or "").strip()
     upload.parse_status = new_status
     upload.parse_error = error_msg
+    if file_hash:
+        upload.file_hash = file_hash
     upload.last_synced_at = datetime.now(timezone.utc).isoformat()
     await session.commit()
     return upload

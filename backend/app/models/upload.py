@@ -1,5 +1,5 @@
 """上传记录 ORM 模型。"""
-from sqlalchemy import Integer, String, Text, Index
+from sqlalchemy import Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -22,6 +22,7 @@ class Upload(Base):
     file_name: Mapped[str] = mapped_column(String(512), nullable=False)
     file_type: Mapped[str] = mapped_column(String(16), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     parse_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
     parse_error: Mapped[str] = mapped_column(Text, default="", nullable=False)
     weknora_task_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
@@ -31,6 +32,7 @@ class Upload(Base):
     __table_args__ = (
         Index("idx_uploads_user_time", "uploader_user_id", "uploaded_at"),
         Index("idx_uploads_kb_time", "kb_id", "uploaded_at"),
+        Index("idx_uploads_kb_hash", "kb_id", "file_hash"),
         Index("idx_uploads_status", "parse_status"),
         Index("idx_uploads_time", "uploaded_at"),
     )

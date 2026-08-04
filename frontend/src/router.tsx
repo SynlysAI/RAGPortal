@@ -17,12 +17,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore()
-  if (user?.role !== 'admin') return <Navigate to="/upload" replace />
-  return <>{children}</>
-}
-
 export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/upload" replace /> },
   { path: '/login', element: <LoginPage /> },
@@ -44,11 +38,11 @@ export const router = createBrowserRouter([
       },
       {
         path: '/admin/dashboard',
-        element: <AuthGuard><AdminGuard><DashboardPage /></AdminGuard></AuthGuard>,
+        element: <AuthGuard><DashboardPage /></AuthGuard>,
       },
       {
         path: '/admin/uploads',
-        element: <AuthGuard><AdminGuard><UploadsAdminPage /></AdminGuard></AuthGuard>,
+        element: <AuthGuard><UploadsAdminPage /></AuthGuard>,
       },
       { path: '*', element: <Navigate to="/upload" replace /> },
     ],

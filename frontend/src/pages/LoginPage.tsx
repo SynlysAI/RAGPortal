@@ -49,6 +49,7 @@ export default function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
               placeholder="AI⁴MS 账号"
+              autoComplete="username"
               required
             />
           </div>
@@ -59,7 +60,8 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
-              placeholder="••••••"
+              placeholder="AI⁴MS 密码"
+              autoComplete="current-password"
               required
             />
           </div>

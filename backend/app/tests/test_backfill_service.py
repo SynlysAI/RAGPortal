@@ -11,6 +11,7 @@ from app.services.backfill_service import (
     _extract_uploader,
     _mark_missing_knowledge_deleted,
     _parse_metadata,
+    _upsert_knowledge,
 )
 
 
@@ -23,6 +24,10 @@ class _FakeScalarResult:
     def all(self):
         """返回模拟记录列表。"""
         return self._items
+
+    def first(self):
+        """返回首条模拟记录。"""
+        return self._items[0] if self._items else None
 
 
 class _FakeResult:
@@ -42,10 +47,15 @@ class _FakeSession:
     def __init__(self, items):
         self._items = items
         self.commits = 0
+        self.added = []
 
     async def execute(self, stmt):
         """返回固定查询记录。"""
         return _FakeResult(self._items)
+
+    def add(self, item):
+        """记录新增对象。"""
+        self.added.append(item)
 
     async def commit(self):
         """记录提交次数。"""
@@ -95,6 +105,7 @@ async def test_mark_missing_knowledge_deleted():
         file_name="missing.pdf",
         file_type="pdf",
         file_size=123,
+        file_hash="",
         parse_status="success",
         parse_error="",
         weknora_task_id="",
@@ -112,6 +123,7 @@ async def test_mark_missing_knowledge_deleted():
         file_name="existing.pdf",
         file_type="pdf",
         file_size=123,
+        file_hash="",
         parse_status="success",
         parse_error="",
         weknora_task_id="",
@@ -127,3 +139,25 @@ async def test_mark_missing_knowledge_deleted():
     assert missing.parse_error == DELETED_ERROR
     assert existing.parse_status == "success"
     assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_upsert_knowledge_persists_file_hash():
+    """历史回写时应把 WeKnora 返回的 file_hash 一并保存。"""
+    session = _FakeSession([])
+    kb = {"id": "kb-1", "name": "测试知识库"}
+    knowledge = {
+        "id": "k-1",
+        "file_name": "report.pdf",
+        "file_type": "pdf",
+        "file_size": 123,
+        "file_hash": "abc123",
+        "metadata": {"uploader_name": "alice"},
+        "parse_status": "success",
+        "created_at": "2026-08-03T00:00:00+08:00",
+    }
+
+    result = await _upsert_knowledge(session, kb, knowledge)
+
+    assert result == "created"
+    assert session.added[0].file_hash == "abc123"

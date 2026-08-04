@@ -3,6 +3,7 @@ import { adminApi, type AdminListParams } from '@/api/admin'
 import { kbApi, type KbInfo } from '@/api/kb'
 import type { UploadRecord } from '@/api/uploads'
 import StatusBadge from '@/components/StatusBadge'
+import { useAuthStore } from '@/stores/authStore'
 import { formatFileSize, formatTime } from '@/utils/format'
 
 const PAGE_SIZE = 20
@@ -13,6 +14,7 @@ export default function UploadsAdminPage() {
   const [kbs, setKbs] = useState<KbInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
+  const isAdmin = useAuthStore((state) => state.user?.role === 'admin')
   const [filters, setFilters] = useState<AdminListParams>({
     page: 1,
     page_size: PAGE_SIZE,
@@ -77,22 +79,31 @@ export default function UploadsAdminPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">全部上传记录</h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleBackfill}
-            disabled={backfilling}
-            className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {backfilling ? '回写中...' : '历史回写'}
-          </button>
-          <button
-            onClick={handleSync}
-            className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors"
-          >
-            ↻ 刷新状态
-          </button>
+          <h2 className="text-lg font-bold text-slate-800">全部上传记录</h2>
+          {!isAdmin && (
+            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+              只读预览
+            </span>
+          )}
         </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBackfill}
+              disabled={backfilling}
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {backfilling ? '回写中...' : '历史回写'}
+            </button>
+            <button
+              onClick={handleSync}
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-50 transition-colors"
+            >
+              ↻ 刷新状态
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 筛选条 */}
@@ -143,14 +154,16 @@ export default function UploadsAdminPage() {
         />
       </div>
 
-      <div className="flex justify-end">
-        <button
-          onClick={handleExport}
-          className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors shadow-sm"
-        >
-          ⬇ 导出 CSV
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleExport}
+            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors shadow-sm"
+          >
+            ⬇ 导出 CSV
+          </button>
+        </div>
+      )}
 
       {/* 表格 */}
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">

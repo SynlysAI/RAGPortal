@@ -44,7 +44,9 @@ export default function UploadPage() {
       .finally(() => setUsersLoading(false))
   }, [isAdmin, user?.user_id])
 
-  const completed = items.filter((it) => it.status === 'success' || it.status === 'failed').length
+  const completed = items.filter(
+    (it) => it.status === 'success' || it.status === 'failed' || it.status === 'duplicate',
+  ).length
   const totalProgress = items.length > 0 ? Math.round((completed / items.length) * 100) : 0
 
   function handleFiles(files: File[]) {
@@ -126,6 +128,7 @@ export default function UploadPage() {
                   <span className="text-sm text-center">
                     {it.status === 'success' && <span className="text-green-600">✓</span>}
                     {it.status === 'failed' && <span className="text-red-600">✗</span>}
+                    {it.status === 'duplicate' && <span className="text-amber-600">⧉</span>}
                     {it.status === 'uploading' && <span className="text-blue-600">⏳</span>}
                     {it.status === 'pending' && <span className="text-slate-400">⌛</span>}
                   </span>
@@ -161,6 +164,14 @@ export default function UploadPage() {
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700"
                       >
                         失败
+                      </span>
+                    )}
+                    {it.status === 'duplicate' && (
+                      <span
+                        title={it.error || '文件已存在，已跳过重复上传'}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700"
+                      >
+                        已存在
                       </span>
                     )}
                     {it.status === 'uploading' && (
