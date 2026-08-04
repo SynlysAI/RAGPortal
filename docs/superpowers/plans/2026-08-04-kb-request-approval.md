@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 普通用户提交知识库申请，管理员审批后由系统按默认模板创建 WeKnora 知识库并回填可上传的 `kb_id`。
+**Goal:** 普通用户提交知识库申请，管理员审批后记录通过结果，并由管理员在 WeKnora 中手工创建知识库并选择模型参数。
 
-**Architecture:** 新增一张本地申请表保存申请、审批与创建状态。后端提供用户提交接口和管理员审核接口，审核通过时由服务层调用 WeKnora 创建知识库。前端在上传页增加申请入口，在管理端增加申请审核页面，知识库选择仍复用现有列表接口。
+**Architecture:** 新增一张本地申请表保存申请与审批状态。后端提供用户提交接口和管理员审核接口，审核通过时只记录通过结果，不自动调用 WeKnora。前端在上传页增加申请入口，在管理端增加申请审核页面，知识库选择仍复用现有列表接口。
 
 **Tech Stack:** FastAPI, SQLAlchemy, SQLite, React, TypeScript, WeKnora API
 
@@ -30,24 +30,19 @@
 Run: `C:\\conda_envs\\ragportal\\python.exe -m compileall app`
 Expected: 通过，无导入错误。
 
-### Task 2: 封装 WeKnora 创建知识库客户端
+### Task 2: 明确 WeKnora 手工创建边界
 
 **Files:**
 - Modify: `backend/app/core/weknora.py`
 - Create: `backend/app/services/kb_create_service.py`
 
-- [ ] **Step 1: 写创建接口封装**
+- [ ] **Step 1: 保留现有 WeKnora 客户端**
 
-为 `POST /api/v1/knowledge-bases` 增加一个异步封装，传入 `name`、`description` 和后端默认模板。
+不新增自动创建知识库的服务调用，管理员按 WeKnora 原生页面手工创建知识库并选择 embedding 模型。
 
-- [ ] **Step 2: 固定默认模板**
+- [ ] **Step 2: 在审批页提示手工创建**
 
-默认值固定在后端服务层，不从前端透出模型选择。模板里显式设置 `type=document`、`is_temporary=false`，其余配置按系统默认值补齐。
-
-- [ ] **Step 3: 验证响应结构**
-
-Run: `C:\\conda_envs\\ragportal\\python.exe -m pytest app\\tests\\test_weknora_*.py`
-Expected: 现有 WeKnora 客户端测试继续通过。
+把管理端审批动作文案改为“通过申请”，并提示管理员在 WeKnora 中完成知识库创建。
 
 ### Task 3: 实现申请提交与管理员审批接口
 
@@ -63,11 +58,11 @@ Expected: 现有 WeKnora 客户端测试继续通过。
 
 - [ ] **Step 2: 实现管理员审批**
 
-管理员通过 `/api/admin/kb-requests/:id/approve` 触发创建知识库；通过 `/reject` 驳回申请。
+管理员通过 `/api/admin/kb-requests/:id/approve` 标记申请通过；通过 `/reject` 驳回申请。
 
-- [ ] **Step 3: 处理失败状态**
+- [ ] **Step 3: 保留人工创建的说明**
 
-若 WeKnora 创建失败，把申请改为 `failed` 并保留错误信息，避免卡在处理中。
+通过后的申请只保存审核信息，不保存自动创建结果。
 
 - [ ] **Step 4: 接入 FastAPI 路由**
 
@@ -92,7 +87,7 @@ Expected: 现有 WeKnora 客户端测试继续通过。
 
 - [ ] **Step 3: 申请通过后刷新知识库列表**
 
-审批成功后刷新知识库下拉框数据，确保新库立刻可选。
+管理员完成 WeKnora 手工创建后，刷新知识库下拉框数据，确保新库可选。
 
 ### Task 5: 补测试并做端到端验证
 
@@ -114,4 +109,3 @@ Expected: 通过。
 
 Run: `npm run build`
 Expected: 构建通过。
-

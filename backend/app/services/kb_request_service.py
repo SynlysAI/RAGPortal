@@ -6,16 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import UserInfo
-from app.core.weknora import WeknoraError, create_knowledge_base
 from app.models.kb_request import KbRequest
-from app.services.kb_service import clear_cache
 
 PENDING_STATUS = "pending"
 APPROVED_STATUS = "approved"
 REJECTED_STATUS = "rejected"
-CREATED_STATUS = "created"
-FAILED_STATUS = "failed"
-DEFAULT_KB_TYPE = "document"
 
 
 class KbRequestError(Exception):
@@ -127,15 +122,15 @@ async def approve_request(
     request_id: int,
     reviewer: UserInfo,
 ) -> dict[str, Any]:
-    """批准申请并调用 WeKnora 创建知识库。"""
+    """批准申请，但不直接创建知识库。
+
+    管理员需要在 WeKnora 中手工创建知识库并选择合适的模型参数，
+    再让知识库列表自然出现在 RAGPortal 的可选范围内。
+    """
     request = await session.get(KbRequest, request_id)
     if request is None:
         raise KbRequestError(404, "申请不存在")
-    if request.status == CREATED_STATUS:
-        raise KbRequestError(409, "该知识库申请已经创建完成")
-    if request.status == APPROVED_STATUS and not request.approved_kb_id and not request.create_error:
-        raise KbRequestError(409, "该知识库申请正在创建中")
-    if request.status not in (PENDING_STATUS, APPROVED_STATUS, REJECTED_STATUS, FAILED_STATUS):
+    if request.status != PENDING_STATUS:
         raise KbRequestError(409, "当前状态不允许审批")
 
     now = _now_iso()
@@ -143,41 +138,11 @@ async def approve_request(
     request.reviewer_user_id = reviewer.user_id
     request.reviewer_username = reviewer.username
     request.review_reason = ""
+    request.approved_kb_id = ""
+    request.approved_kb_name = ""
     request.create_error = ""
     request.updated_at = now
     await session.commit()
-
-    payload = {
-        "name": request.requested_name,
-        "description": request.requested_description,
-        "type": DEFAULT_KB_TYPE,
-        "is_temporary": False,
-    }
-
-    try:
-        kb = await create_knowledge_base(payload)
-    except WeknoraError as exc:
-        request.status = FAILED_STATUS
-        request.create_error = exc.message
-        request.updated_at = _now_iso()
-        await session.commit()
-        return _serialize_request(request)
-
-    kb_id = str(kb.get("id") or "").strip()
-    if not kb_id:
-        request.status = FAILED_STATUS
-        request.create_error = "WeKnora 响应缺少知识库 ID"
-        request.updated_at = _now_iso()
-        await session.commit()
-        return _serialize_request(request)
-
-    request.status = CREATED_STATUS
-    request.approved_kb_id = kb_id
-    request.approved_kb_name = str(kb.get("name") or request.requested_name)
-    request.create_error = ""
-    request.updated_at = _now_iso()
-    await session.commit()
-    clear_cache()
     return _serialize_request(request)
 
 
@@ -191,8 +156,8 @@ async def reject_request(
     request = await session.get(KbRequest, request_id)
     if request is None:
         raise KbRequestError(404, "申请不存在")
-    if request.status == CREATED_STATUS:
-        raise KbRequestError(409, "该知识库申请已经创建完成")
+    if request.status != PENDING_STATUS:
+        raise KbRequestError(409, "当前状态不允许驳回")
     request.status = REJECTED_STATUS
     request.reviewer_user_id = reviewer.user_id
     request.reviewer_username = reviewer.username

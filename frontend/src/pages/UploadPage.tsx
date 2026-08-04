@@ -183,7 +183,7 @@ export default function UploadPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-800">我的知识库申请</h3>
-            <p className="mt-1 text-xs text-slate-500">只提交名称、描述和申请理由，管理员通过后自动创建。</p>
+            <p className="mt-1 text-xs text-slate-500">只提交名称、描述和申请理由，管理员通过后会在 WeKnora 手工创建知识库。</p>
           </div>
           <span className="text-xs text-slate-500">{myRequestsLoading ? '加载中...' : `${myRequests.length} 条`}</span>
         </div>
@@ -203,8 +203,11 @@ export default function UploadPage() {
                 </div>
                 <div className="shrink-0 text-right">
                   <div className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${requestStatusClass(item.status)}`}>
-                    {requestStatusText(item.status)}
+                    {item.status === 'approved' ? '已通过' : requestStatusText(item.status)}
                   </div>
+                  {item.status === 'approved' && (
+                    <div className="mt-1 text-xs text-slate-500">待管理员手工创建</div>
+                  )}
                   {item.approved_kb_name && (
                     <div className="mt-1 text-xs text-slate-500">创建为: {item.approved_kb_name}</div>
                   )}
@@ -235,7 +238,7 @@ export default function UploadPage() {
                   value={requestForm.requested_name}
                   onChange={(e) => setRequestForm({ ...requestForm, requested_name: e.target.value })}
                   className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                  placeholder="例如：比赛资料库"
+                  placeholder="例如：高分子学术资料库"
                 />
               </label>
               <label className="block">
@@ -255,7 +258,7 @@ export default function UploadPage() {
                   onChange={(e) => setRequestForm({ ...requestForm, request_reason: e.target.value })}
                   rows={3}
                   className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
-                  placeholder="例如：比赛队伍需要一个新的资料库"
+                  placeholder="例如：用于整理高分子方向论文、实验记录和课程资料"
                 />
               </label>
             </div>

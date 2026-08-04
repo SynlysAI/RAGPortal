@@ -147,8 +147,8 @@ async def test_create_request_rejects_duplicate_pending(demo_user):
 
 
 @pytest.mark.asyncio
-async def test_approve_request_creates_kb(monkeypatch, demo_admin):
-    """审批通过后应调用 WeKnora 创建知识库并标记为 created。"""
+async def test_approve_request_marks_approved_only(demo_admin):
+    """审批通过后只应更新为 approved，不直接创建知识库。"""
     session = _FakeSession([])
     request = KbRequest(
         id=1,
@@ -170,26 +170,18 @@ async def test_approve_request_creates_kb(monkeypatch, demo_admin):
     )
     session.items.append(request)
 
-    captured = {}
-
-    async def fake_create_knowledge_base(payload):
-        captured["payload"] = payload
-        return {"id": "kb-1", "name": payload["name"]}
-
-    monkeypatch.setattr(kb_request_service, "create_knowledge_base", fake_create_knowledge_base)
-    monkeypatch.setattr(kb_request_service, "clear_cache", lambda: None)
-
     result = await kb_request_service.approve_request(session, 1, demo_admin)
 
-    assert result["status"] == kb_request_service.CREATED_STATUS
-    assert result["approved_kb_id"] == "kb-1"
-    assert captured["payload"]["type"] == kb_request_service.DEFAULT_KB_TYPE
-    assert session.commits >= 2
+    assert result["status"] == kb_request_service.APPROVED_STATUS
+    assert result["approved_kb_id"] == ""
+    assert result["approved_kb_name"] == ""
+    assert result["create_error"] == ""
+    assert session.commits == 1
 
 
 @pytest.mark.asyncio
-async def test_approve_request_marks_failed_on_weknora_error(monkeypatch, demo_admin):
-    """WeKnora 创建失败时应回写 failed。"""
+async def test_approve_request_rejects_non_pending(demo_admin):
+    """非待审核状态不能再次审批。"""
     session = _FakeSession([])
     request = KbRequest(
         id=1,
@@ -199,9 +191,9 @@ async def test_approve_request_marks_failed_on_weknora_error(monkeypatch, demo_a
         requested_name="比赛资料库",
         requested_description="放比赛资料",
         request_reason="比赛需要新的资料库",
-        status=kb_request_service.PENDING_STATUS,
-        reviewer_user_id="",
-        reviewer_username="",
+        status=kb_request_service.APPROVED_STATUS,
+        reviewer_user_id="admin",
+        reviewer_username="admin",
         review_reason="",
         approved_kb_id="",
         approved_kb_name="",
@@ -211,15 +203,10 @@ async def test_approve_request_marks_failed_on_weknora_error(monkeypatch, demo_a
     )
     session.items.append(request)
 
-    async def fake_create_knowledge_base(payload):
-        raise kb_request_service.WeknoraError(400, "create failed")
+    with pytest.raises(kb_request_service.KbRequestError) as exc:
+        await kb_request_service.approve_request(session, 1, demo_admin)
 
-    monkeypatch.setattr(kb_request_service, "create_knowledge_base", fake_create_knowledge_base)
-
-    result = await kb_request_service.approve_request(session, 1, demo_admin)
-
-    assert result["status"] == kb_request_service.FAILED_STATUS
-    assert result["create_error"] == "create failed"
+    assert exc.value.status_code == 409
 
 
 @pytest.mark.asyncio

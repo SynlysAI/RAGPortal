@@ -34,7 +34,7 @@ async def admin_approve_kb_request(
     admin: UserInfo = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """批准并创建知识库。"""
+    """批准知识库申请。"""
     try:
         return await approve_request(session, request_id, admin)
     except KbRequestError as exc:

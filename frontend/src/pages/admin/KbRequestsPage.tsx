@@ -42,14 +42,14 @@ export default function KbRequestsPage() {
   }, [page, status])
 
   async function handleApprove(item: KbRequestRecord) {
-    if (!window.confirm(`通过并创建知识库「${item.requested_name}」？`)) {
+    if (!window.confirm(`通过知识库申请「${item.requested_name}」？通过后请在 WeKnora 手工创建知识库并选择模型。`)) {
       return
     }
     setApprovingId(item.id)
     try {
       await kbRequestApi.approve(item.id)
       load()
-      alert('已通过并创建知识库')
+      alert('已通过申请，请到 WeKnora 手工创建知识库')
     } catch (err: any) {
       alert(err.response?.data?.detail || err.message || '审批失败')
     } finally {
@@ -86,7 +86,7 @@ export default function KbRequestsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-800">知识库申请审批</h2>
-          <p className="mt-1 text-sm text-slate-500">普通用户只填必要信息，管理员通过后由系统按默认模板创建知识库。</p>
+          <p className="mt-1 text-sm text-slate-500">普通用户只填必要信息，管理员通过后请在 WeKnora 手工创建知识库并选择 embedding 模型。</p>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -119,7 +119,7 @@ export default function KbRequestsPage() {
           <div>申请人</div>
           <div>说明</div>
           <div>状态</div>
-          <div>创建结果</div>
+          <div>创建状态</div>
           <div className="text-right">操作</div>
         </div>
 
@@ -153,7 +153,10 @@ export default function KbRequestsPage() {
                 {item.approved_kb_name ? (
                   <div className="text-slate-700">{item.approved_kb_name}</div>
                 ) : (
-                  <div className="text-slate-400">—</div>
+                  <div className="text-slate-400">待手工创建</div>
+                )}
+                {item.status === 'approved' && !item.approved_kb_name && (
+                  <div className="mt-1 text-xs text-slate-500">完成后可直接在上传页选择新知识库</div>
                 )}
                 {item.create_error && (
                   <div className="mt-1 text-xs text-red-600" title={item.create_error}>
@@ -164,14 +167,14 @@ export default function KbRequestsPage() {
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => handleApprove(item)}
-                  disabled={approvingId === item.id || item.status === 'created'}
+                  disabled={approvingId === item.id || item.status !== 'pending'}
                   className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {approvingId === item.id ? '处理中' : '通过'}
                 </button>
                 <button
                   onClick={() => setRejectingItem(item)}
-                  disabled={approvingId === item.id || item.status === 'created'}
+                  disabled={approvingId === item.id || item.status !== 'pending'}
                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   驳回
