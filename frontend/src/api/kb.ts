@@ -7,8 +7,8 @@ export interface KbInfo {
 }
 
 export const kbApi = {
-  async list(): Promise<KbInfo[]> {
-    const resp = await api.get('/kb/list')
+  async list(refresh = false): Promise<KbInfo[]> {
+    const resp = await api.get('/kb/list', { params: { refresh } })
     return resp.data.items
   },
 }

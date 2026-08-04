@@ -31,6 +31,7 @@ export default function KbRequestsPage() {
   const [refreshTick, setRefreshTick] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [approvingId, setApprovingId] = useState<number | null>(null)
+  const [selectedItem, setSelectedItem] = useState<KbRequestRecord | null>(null)
   const [rejectingItem, setRejectingItem] = useState<KbRequestRecord | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [form, setForm] = useState(INITIAL_FORM)
@@ -113,6 +114,7 @@ export default function KbRequestsPage() {
     setApprovingId(item.id)
     try {
       await kbRequestApi.approve(item.id)
+      setSelectedItem(null)
       setRefreshTick((value) => value + 1)
       alert('已通过申请，请到 WeKnora 手工创建知识库')
     } catch (err: any) {
@@ -128,6 +130,7 @@ export default function KbRequestsPage() {
     try {
       await kbRequestApi.reject(rejectingItem.id, rejectReason)
       setRejectingItem(null)
+      setSelectedItem(null)
       setRejectReason('')
       setRefreshTick((value) => value + 1)
       alert('已驳回申请')
@@ -144,8 +147,8 @@ export default function KbRequestsPage() {
     : '在这里提交知识库申请，并查看自己提交的历史记录和处理状态。'
 
   const requestColumns = isAdmin
-    ? 'grid-cols-[1.25fr_0.9fr_1.1fr_0.95fr_1fr_0.85fr]'
-    : 'grid-cols-[1.4fr_1.1fr_1fr_1fr]'
+    ? 'grid-cols-[1.3fr_1fr_0.95fr_1fr_0.8fr]'
+    : 'grid-cols-[1.5fr_0.95fr_1fr_0.8fr]'
 
   return (
     <div className="space-y-6">
@@ -157,7 +160,7 @@ export default function KbRequestsPage() {
           </div>
           {isAdmin && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              管理员审批后仍需在 WeKnora 手工创建知识库并选择 embedding 模型。
+              管理员审批后仍需在 WeKnora 手工创建知识库。
             </div>
           )}
         </div>
@@ -244,10 +247,9 @@ export default function KbRequestsPage() {
           >
             <div>申请信息</div>
             {isAdmin && <div>申请人</div>}
-            <div>说明</div>
             <div>状态</div>
             <div>创建状态</div>
-            {isAdmin && <div className="text-right">操作</div>}
+            <div className="text-right">操作</div>
           </div>
 
           {loading ? (
@@ -274,16 +276,10 @@ export default function KbRequestsPage() {
                     <div className="text-xs text-slate-500">{item.requester_organization || '—'}</div>
                   </div>
                 )}
-                <div className="truncate text-slate-600" title={item.request_reason || item.requested_description || '—'}>
-                  {item.request_reason || item.requested_description || '—'}
-                </div>
                 <div>
                   <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${STATUS_LABELS[item.status].cls}`}>
                     {STATUS_LABELS[item.status].text}
                   </span>
-                  {item.review_reason && (
-                    <div className="mt-1 text-xs text-slate-500">驳回原因: {item.review_reason}</div>
-                  )}
                 </div>
                 <div>
                   {item.approved_kb_name ? (
@@ -291,33 +287,15 @@ export default function KbRequestsPage() {
                   ) : (
                     <div className="text-slate-400">待手工创建</div>
                   )}
-                  {item.status === 'approved' && !item.approved_kb_name && (
-                    <div className="mt-1 text-xs text-slate-500">完成后可直接在上传页选择新知识库</div>
-                  )}
-                  {item.create_error && (
-                    <div className="mt-1 text-xs text-red-600" title={item.create_error}>
-                      {item.create_error}
-                    </div>
-                  )}
                 </div>
-                {isAdmin && (
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleApprove(item)}
-                      disabled={approvingId === item.id || item.status !== 'pending'}
-                      className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {approvingId === item.id ? '处理中' : '通过'}
-                    </button>
-                    <button
-                      onClick={() => setRejectingItem(item)}
-                      disabled={approvingId === item.id || item.status !== 'pending'}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      驳回
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setSelectedItem(item)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    查看详情
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -348,6 +326,116 @@ export default function KbRequestsPage() {
           </div>
         )}
       </section>
+
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40">
+          <div className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">申请详情</h3>
+                <p className="mt-1 text-xs text-slate-500">查看完整申请信息后再决定是否审批。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="space-y-5">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">申请名称</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{selectedItem.requested_name}</div>
+                </div>
+                {isAdmin && (
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">申请人</div>
+                    <div className="mt-1 text-sm text-slate-800">{selectedItem.requester_username}</div>
+                    <div className="text-xs text-slate-500">{selectedItem.requester_organization || '—'}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-xs font-medium text-slate-500">申请理由</div>
+                  <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    {selectedItem.request_reason || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">知识库说明</div>
+                  <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    {selectedItem.requested_description || '—'}
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">状态</div>
+                    <div className="mt-1">
+                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${STATUS_LABELS[selectedItem.status].cls}`}>
+                        {STATUS_LABELS[selectedItem.status].text}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">申请时间</div>
+                    <div className="mt-1 text-sm text-slate-700">{formatTime(selectedItem.created_at)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">创建状态</div>
+                    <div className="mt-1 text-sm text-slate-700">
+                      {selectedItem.approved_kb_name ? selectedItem.approved_kb_name : '待手工创建'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">审批人</div>
+                    <div className="mt-1 text-sm text-slate-700">{selectedItem.reviewer_username || '—'}</div>
+                  </div>
+                </div>
+                {selectedItem.review_reason && (
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">驳回原因</div>
+                    <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      {selectedItem.review_reason}
+                    </div>
+                  </div>
+                )}
+                {selectedItem.create_error && (
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">创建错误</div>
+                    <div className="mt-1 whitespace-pre-wrap rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {selectedItem.create_error}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {isAdmin && selectedItem.status === 'pending' && (
+              <div className="border-t border-slate-200 px-6 py-4">
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRejectingItem(selectedItem)}
+                    className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    驳回
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(selectedItem)}
+                    disabled={approvingId === selectedItem.id}
+                    className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {approvingId === selectedItem.id ? '处理中' : '通过'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {rejectingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">

@@ -31,7 +31,6 @@ export default function NavBar() {
           <nav className="flex items-center gap-1">
             <Link to="/upload" className={linkCls('/upload')}>上传</Link>
             <Link to="/my-uploads" className={linkCls('/my-uploads')}>我的记录</Link>
-            <Link to="/kb-requests" className={linkCls('/kb-requests')}>知识库申请</Link>
             {user && (
               <div
                 className="relative"
