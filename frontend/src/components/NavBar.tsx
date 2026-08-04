@@ -31,6 +31,7 @@ export default function NavBar() {
           <nav className="flex items-center gap-1">
             <Link to="/upload" className={linkCls('/upload')}>上传</Link>
             <Link to="/my-uploads" className={linkCls('/my-uploads')}>我的记录</Link>
+            <Link to="/kb-requests" className={linkCls('/kb-requests')}>知识库申请</Link>
             {user && (
               <div
                 className="relative"
@@ -45,9 +46,7 @@ export default function NavBar() {
                     <div className="rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                       <Link to="/admin/dashboard" className="block px-3 py-2 text-sm hover:bg-slate-50">仪表盘</Link>
                       <Link to="/admin/uploads" className="block px-3 py-2 text-sm hover:bg-slate-50">上传记录</Link>
-                      {user?.role === 'admin' && (
-                        <Link to="/admin/kb-requests" className="block px-3 py-2 text-sm hover:bg-slate-50">知识库申请</Link>
-                      )}
+                      <Link to="/kb-requests" className="block px-3 py-2 text-sm hover:bg-slate-50">知识库申请</Link>
                     </div>
                   </div>
                 )}

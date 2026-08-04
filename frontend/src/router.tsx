@@ -46,8 +46,12 @@ export const router = createBrowserRouter([
         element: <AuthGuard><UploadsAdminPage /></AuthGuard>,
       },
       {
-        path: '/admin/kb-requests',
+        path: '/kb-requests',
         element: <AuthGuard><KbRequestsPage /></AuthGuard>,
+      },
+      {
+        path: '/admin/kb-requests',
+        element: <Navigate to="/kb-requests" replace />,
       },
       { path: '*', element: <Navigate to="/upload" replace /> },
     ],
