@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { adminApi, type AdminListParams } from '@/api/admin'
 import { kbApi, type KbInfo } from '@/api/kb'
 import type { UploadRecord } from '@/api/uploads'
@@ -12,6 +12,7 @@ export default function UploadsAdminPage() {
   const [items, setItems] = useState<UploadRecord[]>([])
   const [total, setTotal] = useState(0)
   const [kbs, setKbs] = useState<KbInfo[]>([])
+  const [users, setUsers] = useState<{ user_id: string; organization: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const isAdmin = useAuthStore((state) => state.user?.role === 'admin')
@@ -31,6 +32,14 @@ export default function UploadsAdminPage() {
   }, [])
 
   useEffect(() => {
+    adminApi.listUsers()
+      .then((items) => {
+        setUsers(items.map((item) => ({ user_id: item.user_id, organization: item.organization })))
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     setLoading(true)
     adminApi.list(filters)
       .then((data) => {
@@ -39,6 +48,10 @@ export default function UploadsAdminPage() {
       })
       .finally(() => setLoading(false))
   }, [filters])
+
+  const organizationByUserId = useMemo(() => {
+    return new Map(users.map((item) => [item.user_id, item.organization]))
+  }, [users])
 
   function update<K extends keyof AdminListParams>(key: K, value: AdminListParams[K]) {
     setFilters({ ...filters, [key]: value, page: 1 })
@@ -188,7 +201,9 @@ export default function UploadsAdminPage() {
             >
               <div>
                 <div className="font-semibold text-slate-800">{u.uploader_username}</div>
-                <div className="text-xs text-slate-500">{u.uploader_organization || '—'}</div>
+                <div className="text-xs text-slate-500">
+                  {u.uploader_organization || organizationByUserId.get(u.uploader_user_id || '') || '—'}
+                </div>
               </div>
               <div className="truncate" title={u.file_name}>{u.file_name}</div>
               <div className="truncate text-slate-600">{u.kb_name}</div>

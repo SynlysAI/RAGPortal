@@ -165,6 +165,14 @@ export default function KbRequestsPage() {
           )}
         </div>
 
+        {user && (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">当前提交人</div>
+            <div className="mt-1 text-sm font-semibold text-slate-800">{user.username}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{user.organization || '—'}</div>
+          </div>
+        )}
+
         <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1.2fr_1.6fr_auto]">
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-slate-600">知识库名称</span>
