@@ -79,13 +79,43 @@ async def get_current_user(request: Request) -> UserInfo:
     payload = parse_token(token)
     if payload is None:
         raise HTTPException(status_code=401, detail="令牌无效或已过期")
-    return UserInfo(
+    user = UserInfo(
         user_id=payload["sub"],
         username=payload["username"],
         role=payload["role"],
         status="active",
         organization=payload.get("organization", ""),
     )
+    if not user.organization:
+        ai4ms_user = await _fetch_ai4ms_user(auth)
+        if ai4ms_user:
+            user.organization = str(ai4ms_user.get("organization") or "").strip()
+    return user
+
+
+async def _fetch_ai4ms_user(authorization: str) -> dict | None:
+    """从 AI4MS 获取当前用户的完整信息。
+
+    Args:
+        authorization: 当前请求的 Authorization 头。
+
+    Returns:
+        AI4MS 用户字典；请求失败或响应格式不合法时返回 None。
+    """
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"{settings.resolved_ai4ms_api_base_url}/auth/me",
+                headers={"Authorization": authorization},
+            )
+        if resp.status_code != 200:
+            return None
+        data = resp.json().get("data") or {}
+        user = data.get("user")
+        return user if isinstance(user, dict) else None
+    except (httpx.HTTPError, ValueError):
+        return None
 
 
 async def get_current_admin(user: UserInfo = Depends(get_current_user)) -> UserInfo:

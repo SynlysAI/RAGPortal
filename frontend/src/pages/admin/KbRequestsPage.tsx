@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { adminApi } from '@/api/admin'
 import { kbRequestApi, type KbRequestRecord } from '@/api/kbRequests'
 import { useAuthStore } from '@/stores/authStore'
 import { formatTime } from '@/utils/format'
@@ -23,6 +24,7 @@ export default function KbRequestsPage() {
   const user = useAuthStore((state) => state.user)
   const isAdmin = user?.role === 'admin'
   const [items, setItems] = useState<KbRequestRecord[]>([])
+  const [users, setUsers] = useState<{ user_id: string; organization: string }[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
@@ -42,6 +44,27 @@ export default function KbRequestsPage() {
     setPage(1)
     setStatus('')
   }, [isAdmin])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    adminApi.listUsers()
+      .then((items) => {
+        setUsers(items.map((item) => ({ user_id: item.user_id, organization: item.organization })))
+      })
+      .catch(() => {})
+  }, [isAdmin])
+
+  const organizationByUserId = useMemo(() => {
+    const map = new Map(users.map((item) => [item.user_id, item.organization]))
+    if (user?.user_id && user.organization) {
+      map.set(user.user_id, user.organization)
+    }
+    return map
+  }, [user?.organization, user?.user_id, users])
+
+  function resolveOrganization(item: KbRequestRecord): string {
+    return item.requester_organization || organizationByUserId.get(item.requester_user_id) || '—'
+  }
 
   useEffect(() => {
     let active = true
@@ -146,9 +169,7 @@ export default function KbRequestsPage() {
     ? '用户和管理员共用同一入口。用户只能查看自己的申请，管理员可以查看全部申请并进行审批。'
     : '在这里提交知识库申请，并查看自己提交的历史记录和处理状态。'
 
-  const requestColumns = isAdmin
-    ? 'grid-cols-[1.3fr_1fr_0.95fr_1fr_0.8fr]'
-    : 'grid-cols-[1.5fr_0.95fr_1fr_0.8fr]'
+  const requestColumns = 'grid-cols-[1.2fr_1fr_0.95fr_1fr_0.8fr]'
 
   return (
     <div className="space-y-6">
@@ -254,7 +275,7 @@ export default function KbRequestsPage() {
             className={`grid ${requestColumns} gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600`}
           >
             <div>申请信息</div>
-            {isAdmin && <div>申请人</div>}
+            <div>申请人</div>
             <div>状态</div>
             <div>创建状态</div>
             <div className="text-right">操作</div>
@@ -278,12 +299,10 @@ export default function KbRequestsPage() {
                   <div className="font-semibold text-slate-800">{item.requested_name}</div>
                   <div className="mt-1 text-xs text-slate-500">申请时间 {formatTime(item.created_at)}</div>
                 </div>
-                {isAdmin && (
-                  <div>
-                    <div className="font-medium text-slate-800">{item.requester_username}</div>
-                    <div className="text-xs text-slate-500">{item.requester_organization || '—'}</div>
-                  </div>
-                )}
+                <div>
+                  <div className="font-medium text-slate-800">{item.requester_username}</div>
+                  <div className="text-xs text-slate-500">{resolveOrganization(item)}</div>
+                </div>
                 <div>
                   <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${STATUS_LABELS[item.status].cls}`}>
                     {STATUS_LABELS[item.status].text}
@@ -358,13 +377,11 @@ export default function KbRequestsPage() {
                   <div className="text-xs font-medium text-slate-500">申请名称</div>
                   <div className="mt-1 text-sm font-semibold text-slate-800">{selectedItem.requested_name}</div>
                 </div>
-                {isAdmin && (
-                  <div>
-                    <div className="text-xs font-medium text-slate-500">申请人</div>
-                    <div className="mt-1 text-sm text-slate-800">{selectedItem.requester_username}</div>
-                    <div className="text-xs text-slate-500">{selectedItem.requester_organization || '—'}</div>
-                  </div>
-                )}
+                <div>
+                  <div className="text-xs font-medium text-slate-500">申请人</div>
+                  <div className="mt-1 text-sm text-slate-800">{selectedItem.requester_username}</div>
+                  <div className="text-xs text-slate-500">{resolveOrganization(selectedItem)}</div>
+                </div>
                 <div>
                   <div className="text-xs font-medium text-slate-500">申请理由</div>
                   <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
