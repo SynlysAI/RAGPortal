@@ -45,6 +45,9 @@ export default function NavBar() {
                     <div className="rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                       <Link to="/admin/dashboard" className="block px-3 py-2 text-sm hover:bg-slate-50">仪表盘</Link>
                       <Link to="/admin/uploads" className="block px-3 py-2 text-sm hover:bg-slate-50">上传记录</Link>
+                      {user?.role === 'admin' && (
+                        <Link to="/admin/kb-requests" className="block px-3 py-2 text-sm hover:bg-slate-50">知识库申请</Link>
+                      )}
                     </div>
                   </div>
                 )}

@@ -6,6 +6,7 @@ import SsoPage from '@/pages/SsoPage'
 import UploadPage from '@/pages/UploadPage'
 import MyUploadsPage from '@/pages/MyUploadsPage'
 import DashboardPage from '@/pages/admin/DashboardPage'
+import KbRequestsPage from '@/pages/admin/KbRequestsPage'
 import UploadsAdminPage from '@/pages/admin/UploadsAdminPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -43,6 +44,10 @@ export const router = createBrowserRouter([
       {
         path: '/admin/uploads',
         element: <AuthGuard><UploadsAdminPage /></AuthGuard>,
+      },
+      {
+        path: '/admin/kb-requests',
+        element: <AuthGuard><KbRequestsPage /></AuthGuard>,
       },
       { path: '*', element: <Navigate to="/upload" replace /> },
     ],

@@ -7,9 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.api.v1.admin import router as admin_router
+from app.api.v1.admin_kb_requests import router as admin_kb_requests_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.config import router as config_router
 from app.api.v1.kb import router as kb_router
+from app.api.v1.kb_requests import router as kb_requests_router
 from app.api.v1.uploads import router as uploads_router
 from app.core.config import get_settings
 from app.core.db import init_db
@@ -36,8 +38,10 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(config_router)
     app.include_router(kb_router)
+    app.include_router(kb_requests_router)
     app.include_router(uploads_router)
     app.include_router(admin_router)
+    app.include_router(admin_kb_requests_router)
     return app
 
 

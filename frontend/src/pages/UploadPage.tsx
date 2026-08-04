@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import KbSelector from '@/components/KbSelector'
 import UploadDropzone from '@/components/UploadDropzone'
+import { kbRequestApi, type KbRequestRecord } from '@/api/kbRequests'
 import { useUploadStore } from '@/stores/uploadStore'
 import { useAuthStore } from '@/stores/authStore'
 import { adminApi, type AdminUserInfo } from '@/api/admin'
@@ -13,6 +14,15 @@ export default function UploadPage() {
   const [users, setUsers] = useState<AdminUserInfo[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
+  const [requestModalOpen, setRequestModalOpen] = useState(false)
+  const [requestSubmitting, setRequestSubmitting] = useState(false)
+  const [myRequests, setMyRequests] = useState<KbRequestRecord[]>([])
+  const [myRequestsLoading, setMyRequestsLoading] = useState(false)
+  const [requestForm, setRequestForm] = useState({
+    requested_name: '',
+    requested_description: '',
+    request_reason: '',
+  })
   const [config, setConfig] = useState<{ max_size_mb: number; allowed_file_types: string[] } | null>(null)
   const { items, addFiles, clearCompleted } = useUploadStore()
   const user = useAuthStore((state) => state.user)
@@ -44,6 +54,14 @@ export default function UploadPage() {
       .finally(() => setUsersLoading(false))
   }, [isAdmin, user?.user_id])
 
+  useEffect(() => {
+    setMyRequestsLoading(true)
+    kbRequestApi.mine(1, 5)
+      .then((data) => setMyRequests(data.items))
+      .catch(() => setMyRequests([]))
+      .finally(() => setMyRequestsLoading(false))
+  }, [])
+
   const completed = items.filter(
     (it) => it.status === 'success' || it.status === 'failed' || it.status === 'duplicate',
   ).length
@@ -59,12 +77,73 @@ export default function UploadPage() {
     addFiles(files, kbId, uploaderUserId)
   }
 
+  function openRequestModal() {
+    setRequestForm({ requested_name: '', requested_description: '', request_reason: '' })
+    setRequestModalOpen(true)
+  }
+
+  async function handleSubmitRequest() {
+    if (!requestForm.requested_name.trim()) {
+      alert('请填写知识库名称')
+      return
+    }
+    setRequestSubmitting(true)
+    try {
+      await kbRequestApi.submit(requestForm)
+      const data = await kbRequestApi.mine(1, 5)
+      setMyRequests(data.items)
+      setRequestModalOpen(false)
+      alert('申请已提交，等待管理员审批')
+    } catch (err: any) {
+      alert(err.response?.data?.detail || err.message || '提交申请失败')
+    } finally {
+      setRequestSubmitting(false)
+    }
+  }
+
+  function requestStatusClass(status: KbRequestRecord['status']) {
+    switch (status) {
+      case 'approved':
+        return 'bg-blue-100 text-blue-700'
+      case 'created':
+        return 'bg-emerald-100 text-emerald-700'
+      case 'rejected':
+        return 'bg-slate-100 text-slate-600'
+      case 'failed':
+        return 'bg-red-100 text-red-700'
+      default:
+        return 'bg-amber-100 text-amber-700'
+    }
+  }
+
+  function requestStatusText(status: KbRequestRecord['status']) {
+    switch (status) {
+      case 'approved':
+        return '已通过'
+      case 'created':
+        return '已创建'
+      case 'rejected':
+        return '已驳回'
+      case 'failed':
+        return '创建失败'
+      default:
+        return '待审核'
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-700">上传到:</span>
           <KbSelector value={kbId} onChange={setKbId} />
+          <button
+            type="button"
+            onClick={openRequestModal}
+            className="px-3 py-2 text-sm font-medium text-brand border border-brand/20 bg-brand/5 rounded-md hover:bg-brand/10 transition-colors"
+          >
+            申请新知识库
+          </button>
         </div>
         {isAdmin && (
           <div className="flex items-center gap-3">
@@ -98,6 +177,107 @@ export default function UploadPage() {
           allowedTypes={config.allowed_file_types}
           disabled={!kbId}
         />
+      )}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">我的知识库申请</h3>
+            <p className="mt-1 text-xs text-slate-500">只提交名称、描述和申请理由，管理员通过后自动创建。</p>
+          </div>
+          <span className="text-xs text-slate-500">{myRequestsLoading ? '加载中...' : `${myRequests.length} 条`}</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {myRequestsLoading ? (
+            <div className="py-8 text-center text-sm text-slate-500">加载中...</div>
+          ) : myRequests.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-500">暂无申请记录</div>
+          ) : (
+            myRequests.map((item) => (
+              <div key={item.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-slate-800">{item.requested_name}</div>
+                  <div className="mt-1 truncate text-xs text-slate-500" title={item.request_reason || item.requested_description || '未填写申请说明'}>
+                    {item.request_reason || item.requested_description || '未填写申请说明'}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${requestStatusClass(item.status)}`}>
+                    {requestStatusText(item.status)}
+                  </div>
+                  {item.approved_kb_name && (
+                    <div className="mt-1 text-xs text-slate-500">创建为: {item.approved_kb_name}</div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {requestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">申请新知识库</h3>
+              <button
+                type="button"
+                onClick={() => setRequestModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-slate-600">知识库名称</span>
+                <input
+                  value={requestForm.requested_name}
+                  onChange={(e) => setRequestForm({ ...requestForm, requested_name: e.target.value })}
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="例如：比赛资料库"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-slate-600">知识库描述</span>
+                <textarea
+                  value={requestForm.requested_description}
+                  onChange={(e) => setRequestForm({ ...requestForm, requested_description: e.target.value })}
+                  rows={3}
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="可选，简单说明这个知识库要放什么内容"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-slate-600">申请理由</span>
+                <textarea
+                  value={requestForm.request_reason}
+                  onChange={(e) => setRequestForm({ ...requestForm, request_reason: e.target.value })}
+                  rows={3}
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="例如：比赛队伍需要一个新的资料库"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRequestModalOpen(false)}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitRequest}
+                disabled={requestSubmitting}
+                className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {requestSubmitting ? '提交中...' : '提交申请'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {items.length > 0 && (

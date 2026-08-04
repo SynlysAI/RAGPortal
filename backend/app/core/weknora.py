@@ -70,6 +70,19 @@ async def list_knowledge_bases() -> list[dict[str, Any]]:
     ]
 
 
+async def create_knowledge_base(payload: dict[str, Any]) -> dict[str, Any]:
+    """创建知识库。"""
+    async with _client() as c:
+        resp = await c.post("/api/v1/knowledge-bases", json=payload)
+    if resp.status_code not in (200, 201):
+        raise WeknoraError(
+            resp.status_code,
+            _safe_json(resp).get("detail", "创建知识库失败"),
+            _safe_json(resp),
+        )
+    return _extract_response_data(_safe_json(resp))
+
+
 async def get_knowledge(knowledge_id: str) -> dict[str, Any]:
     """查询单个 knowledge 的最新状态。"""
     async with _client() as c:
