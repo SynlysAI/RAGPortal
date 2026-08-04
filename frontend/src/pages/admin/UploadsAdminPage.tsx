@@ -32,12 +32,16 @@ export default function UploadsAdminPage() {
   }, [])
 
   useEffect(() => {
+    if (!isAdmin) {
+      setUsers([])
+      return
+    }
     adminApi.listUsers()
       .then((items) => {
         setUsers(items.map((item) => ({ user_id: item.user_id, organization: item.organization })))
       })
       .catch(() => {})
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     setLoading(true)
