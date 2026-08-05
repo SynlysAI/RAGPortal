@@ -169,7 +169,9 @@ export default function KbRequestsPage() {
     ? '用户和管理员共用同一入口。用户只能查看自己的申请，管理员可以查看全部申请并进行审批。'
     : '在这里提交知识库申请，并查看自己提交的历史记录和处理状态。'
 
-  const requestColumns = 'grid-cols-[1.2fr_1fr_0.95fr_1fr_0.8fr]'
+  const requestColumns = isAdmin
+    ? 'grid-cols-[1.2fr_1fr_0.95fr_1fr_0.8fr]'
+    : 'grid-cols-[1.2fr_1fr_0.95fr_1fr]'
 
   return (
     <div className="space-y-6">
@@ -278,7 +280,7 @@ export default function KbRequestsPage() {
             <div>申请人</div>
             <div>状态</div>
             <div>创建状态</div>
-            <div className="text-right">操作</div>
+            {isAdmin && <div className="text-right">操作</div>}
           </div>
 
           {loading ? (
@@ -293,7 +295,8 @@ export default function KbRequestsPage() {
             items.map((item) => (
               <div
                 key={item.id}
-                className={`grid ${requestColumns} gap-3 border-t border-slate-100 px-4 py-3 text-sm`}
+                onClick={() => setSelectedItem(item)}
+                className={`grid ${requestColumns} cursor-pointer gap-3 border-t border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50`}
               >
                 <div>
                   <div className="font-semibold text-slate-800">{item.requested_name}</div>
@@ -315,14 +318,32 @@ export default function KbRequestsPage() {
                     <div className="text-slate-400">待手工创建</div>
                   )}
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setSelectedItem(item)}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    查看详情
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setRejectingItem(item)
+                      }}
+                      disabled={item.status !== 'pending'}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:bg-slate-50"
+                    >
+                      驳回
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleApprove(item)
+                      }}
+                      disabled={approvingId === item.id || item.status !== 'pending'}
+                      className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:bg-slate-50"
+                    >
+                      {approvingId === item.id ? '处理中' : '通过'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
