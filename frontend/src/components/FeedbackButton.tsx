@@ -185,7 +185,7 @@ export default function FeedbackButton() {
                 {content.length} / {MAX_CONTENT_LENGTH}
               </div>
 
-              <div className="flex items-center gap-2 mt-3 mb-1 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 mt-3 mb-1 text-xs text-slate-400">
                 提交人：<b className="text-slate-600 font-medium">{user?.username || '当前登录用户'}</b>
               </div>
             </div>
