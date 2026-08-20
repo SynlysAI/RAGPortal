@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
+import FeedbackButton from '@/components/FeedbackButton'
 
 export default function NavBar() {
   const { user, logout } = useAuthStore()
@@ -53,11 +54,13 @@ export default function NavBar() {
             )}
           </nav>
         </div>
-        <div
-          className="relative"
-          onMouseEnter={() => setUserMenuOpen(true)}
-          onMouseLeave={() => setUserMenuOpen(false)}
-        >
+        <div className="flex items-center gap-2">
+          {user && <FeedbackButton />}
+          <div
+            className="relative"
+            onMouseEnter={() => setUserMenuOpen(true)}
+            onMouseLeave={() => setUserMenuOpen(false)}
+          >
           {user ? (
             <>
               <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
@@ -85,6 +88,7 @@ export default function NavBar() {
               )}
             </>
           ) : null}
+          </div>
         </div>
       </div>
     </header>
