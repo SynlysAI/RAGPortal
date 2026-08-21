@@ -8,6 +8,11 @@ export interface KbRequestRecord {
   requested_name: string
   requested_description: string
   request_reason: string
+  want_wiki: boolean
+  want_llm_graph: boolean
+  extract_focus: string
+  relation_types: string
+  example_text: string
   status: 'pending' | 'approved' | 'rejected' | 'created' | 'failed'
   reviewer_user_id: string
   reviewer_username: string
@@ -23,6 +28,11 @@ export interface SubmitKbRequestBody {
   requested_name: string
   requested_description: string
   request_reason: string
+  want_wiki: boolean
+  want_llm_graph: boolean
+  extract_focus: string
+  relation_types: string
+  example_text: string
 }
 
 export const kbRequestApi = {

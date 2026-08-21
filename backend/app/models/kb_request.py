@@ -17,6 +17,16 @@ class KbRequest(Base):
     requested_name: Mapped[str] = mapped_column(String(255), nullable=False)
     requested_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     request_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # 是否创建 wiki 知识库(需要提取重点)
+    want_wiki: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # 是否创建 LLM 知识图谱(需要提取重点 + 关系类型标签 + 示例文本)
+    want_llm_graph: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # 提取重点:应重点识别的实体和概念
+    extract_focus: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # 关系类型标签:逗号分隔
+    relation_types: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # 示例文档文本
+    example_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
     reviewer_user_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     reviewer_username: Mapped[str] = mapped_column(String(128), default="", nullable=False)

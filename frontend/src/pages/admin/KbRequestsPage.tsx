@@ -18,6 +18,11 @@ const INITIAL_FORM = {
   requested_name: '',
   requested_description: '',
   request_reason: '',
+  want_wiki: false,
+  want_llm_graph: false,
+  extract_focus: '',
+  relation_types: '',
+  example_text: '',
 }
 
 export default function KbRequestsPage() {
@@ -102,10 +107,29 @@ export default function KbRequestsPage() {
     const requestedName = form.requested_name.trim()
     const requestedDescription = form.requested_description.trim()
     const requestReason = form.request_reason.trim()
+    const extractFocus = form.extract_focus.trim()
+    const relationTypes = form.relation_types.trim()
+    const exampleText = form.example_text.trim()
 
     if (!requestedName) {
       alert('请填写知识库名称')
       return
+    }
+    if (form.want_wiki || form.want_llm_graph) {
+      if (!extractFocus) {
+        alert('勾选了 wiki 或 LLM 知识图谱,请填写提取重点')
+        return
+      }
+    }
+    if (form.want_llm_graph) {
+      if (!relationTypes) {
+        alert('勾选了 LLM 知识图谱,请填写关系类型标签')
+        return
+      }
+      if (!exampleText) {
+        alert('勾选了 LLM 知识图谱,请提供一段示例文档文本')
+        return
+      }
     }
 
     setSubmitting(true)
@@ -114,6 +138,11 @@ export default function KbRequestsPage() {
         requested_name: requestedName,
         requested_description: requestedDescription,
         request_reason: requestReason,
+        want_wiki: form.want_wiki,
+        want_llm_graph: form.want_llm_graph,
+        extract_focus: extractFocus,
+        relation_types: relationTypes,
+        example_text: exampleText,
       })
       setForm(INITIAL_FORM)
       setPage(1)
@@ -233,6 +262,74 @@ export default function KbRequestsPage() {
             >
               {submitting ? '提交中...' : '提交申请'}
             </button>
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">额外附加配置(可选)</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={form.want_wiki}
+                onChange={(e) => setForm((prev) => ({ ...prev, want_wiki: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 accent-brand"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">创建 Wiki 知识库</span>
+                <span className="mt-0.5 block text-xs text-slate-500">勾选后需填写提取重点,说明应重点识别的实体和概念。</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={form.want_llm_graph}
+                onChange={(e) => setForm((prev) => ({ ...prev, want_llm_graph: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 accent-brand"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">创建 LLM 知识图谱</span>
+                <span className="mt-0.5 block text-xs text-slate-500">会增加文档解析入库耗时。勾选后需填写提取重点、关系类型标签及示例文本。</span>
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {(form.want_wiki || form.want_llm_graph) && (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-600">提取重点</span>
+                <textarea
+                  value={form.extract_focus}
+                  onChange={(e) => setForm((prev) => ({ ...prev, extract_focus: e.target.value }))}
+                  rows={3}
+                  className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="例如：重点关注高分子材料的分子结构、合成方法、性能参数等实体和概念"
+                />
+              </label>
+            )}
+            {form.want_llm_graph && (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-600">关系类型标签</span>
+                <input
+                  value={form.relation_types}
+                  onChange={(e) => setForm((prev) => ({ ...prev, relation_types: e.target.value }))}
+                  className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="逗号分隔,例如：包含、合成、属于、关联"
+                />
+              </label>
+            )}
+            {form.want_llm_graph && (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-600">示例文档文本</span>
+                <textarea
+                  value={form.example_text}
+                  onChange={(e) => setForm((prev) => ({ ...prev, example_text: e.target.value }))}
+                  rows={4}
+                  className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  placeholder="附带一段示例文档文本,供管理员参考解析效果"
+                />
+              </label>
+            )}
           </div>
         </div>
       </section>
@@ -415,6 +512,49 @@ export default function KbRequestsPage() {
                     {selectedItem.requested_description || '—'}
                   </div>
                 </div>
+                {(selectedItem.want_wiki || selectedItem.want_llm_graph) && (
+                  <>
+                    <div>
+                      <div className="text-xs font-medium text-slate-500">创建配置</div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {selectedItem.want_wiki && (
+                          <span className="inline-flex rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            Wiki 知识库
+                          </span>
+                        )}
+                        {selectedItem.want_llm_graph && (
+                          <span className="inline-flex rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                            LLM 知识图谱
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {selectedItem.extract_focus && (
+                      <div>
+                        <div className="text-xs font-medium text-slate-500">提取重点</div>
+                        <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                          {selectedItem.extract_focus}
+                        </div>
+                      </div>
+                    )}
+                    {selectedItem.relation_types && (
+                      <div>
+                        <div className="text-xs font-medium text-slate-500">关系类型标签</div>
+                        <div className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                          {selectedItem.relation_types}
+                        </div>
+                      </div>
+                    )}
+                    {selectedItem.example_text && (
+                      <div>
+                        <div className="text-xs font-medium text-slate-500">示例文档文本</div>
+                        <div className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                          {selectedItem.example_text}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <div className="text-xs font-medium text-slate-500">状态</div>

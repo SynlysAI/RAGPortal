@@ -37,6 +37,11 @@ def _serialize_request(request: KbRequest) -> dict[str, Any]:
         "requested_name": request.requested_name,
         "requested_description": request.requested_description,
         "request_reason": request.request_reason,
+        "want_wiki": bool(request.want_wiki),
+        "want_llm_graph": bool(request.want_llm_graph),
+        "extract_focus": request.extract_focus,
+        "relation_types": request.relation_types,
+        "example_text": request.example_text,
         "status": request.status,
         "reviewer_user_id": request.reviewer_user_id,
         "reviewer_username": request.reviewer_username,
@@ -55,11 +60,40 @@ async def create_request(
     requested_name: str,
     requested_description: str,
     request_reason: str,
+    want_wiki: bool = False,
+    want_llm_graph: bool = False,
+    extract_focus: str = "",
+    relation_types: str = "",
+    example_text: str = "",
 ) -> KbRequest:
-    """创建一条新的知识库申请。"""
+    """创建一条新的知识库申请。
+
+    Args:
+        session: 数据库会话。
+        user: 当前登录用户。
+        requested_name: 知识库名称。
+        requested_description: 知识库说明。
+        request_reason: 申请理由。
+        want_wiki: 是否创建 wiki 知识库。
+        want_llm_graph: 是否创建 LLM 知识图谱。
+        extract_focus: 提取重点(应重点识别的实体和概念)。
+        relation_types: 关系类型标签(逗号分隔)。
+        example_text: 示例文档文本。
+
+    Returns:
+        新建的申请记录。
+    """
     name = requested_name.strip()
     if not name:
         raise KbRequestError(400, "知识库名称不能为空")
+    if want_wiki or want_llm_graph:
+        if not extract_focus.strip():
+            raise KbRequestError(400, "勾选了 wiki 或 LLM 知识图谱,请填写提取重点")
+    if want_llm_graph:
+        if not relation_types.strip():
+            raise KbRequestError(400, "勾选了 LLM 知识图谱,请填写关系类型标签")
+        if not example_text.strip():
+            raise KbRequestError(400, "勾选了 LLM 知识图谱,请提供示例文档文本")
     result = await session.execute(
         select(KbRequest).where(
             KbRequest.requester_user_id == user.user_id,
@@ -77,6 +111,11 @@ async def create_request(
         requested_name=name,
         requested_description=requested_description.strip(),
         request_reason=request_reason.strip(),
+        want_wiki=want_wiki,
+        want_llm_graph=want_llm_graph,
+        extract_focus=extract_focus.strip(),
+        relation_types=relation_types.strip(),
+        example_text=example_text.strip(),
         status=PENDING_STATUS,
         created_at=now,
         updated_at=now,

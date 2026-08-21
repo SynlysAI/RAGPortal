@@ -49,10 +49,14 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// 登录接口自身的 401 表示账号密码错误,应上抛由登录页提示,不应触发全局跳转。
+const AUTH_LOGIN_PATH = '/auth/login'
+
 api.interceptors.response.use(
   (resp) => resp,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url?.includes(AUTH_LOGIN_PATH)
+    if (error.response?.status === 401 && !isLoginRequest) {
       clearToken()
       if (
         !window.location.pathname.startsWith('/login') &&

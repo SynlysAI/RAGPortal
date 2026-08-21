@@ -16,6 +16,11 @@ class KbRequestCreateBody(BaseModel):
     requested_name: str = Field(min_length=1, max_length=255)
     requested_description: str = ""
     request_reason: str = ""
+    want_wiki: bool = False
+    want_llm_graph: bool = False
+    extract_focus: str = ""
+    relation_types: str = ""
+    example_text: str = ""
 
 
 @router.post("")
@@ -32,6 +37,11 @@ async def submit_kb_request(
             body.requested_name,
             body.requested_description,
             body.request_reason,
+            body.want_wiki,
+            body.want_llm_graph,
+            body.extract_focus,
+            body.relation_types,
+            body.example_text,
         )
     except KbRequestError as exc:
         from fastapi import HTTPException
@@ -45,6 +55,11 @@ async def submit_kb_request(
         "requested_name": record.requested_name,
         "requested_description": record.requested_description,
         "request_reason": record.request_reason,
+        "want_wiki": bool(record.want_wiki),
+        "want_llm_graph": bool(record.want_llm_graph),
+        "extract_focus": record.extract_focus,
+        "relation_types": record.relation_types,
+        "example_text": record.example_text,
         "status": record.status,
         "reviewer_user_id": record.reviewer_user_id,
         "reviewer_username": record.reviewer_username,
