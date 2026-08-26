@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import FeedbackButton from '@/components/FeedbackButton'
+import GuideButton from '@/components/GuideButton'
 
 export default function NavBar() {
   const { user, logout } = useAuthStore()
@@ -55,6 +56,7 @@ export default function NavBar() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <GuideButton />
           {user && <FeedbackButton />}
           <div
             className="relative"
