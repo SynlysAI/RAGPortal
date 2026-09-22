@@ -1,5 +1,6 @@
 """上传与个人历史路由。"""
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import select
@@ -26,6 +27,9 @@ def _to_dict(u: Upload) -> dict:
         "uploader_user_id": u.uploader_user_id,
         "uploader_username": u.uploader_username,
         "uploader_organization": u.uploader_organization,
+        "workspace_slug": u.workspace_slug,
+        "research_project_id": u.research_project_id,
+        "chain_node_id": u.chain_node_id,
         "file_name": u.file_name,
         "file_type": u.file_type,
         "file_size": u.file_size,
@@ -78,6 +82,9 @@ async def upload(
     file: UploadFile = File(...),
     kb_id: str = Form(...),
     uploader_user_id: Optional[str] = Form(None),
+    workspace_slug: Optional[str] = Form(None),
+    research_project_id: Optional[str] = Form(None),
+    chain_node_id: Optional[str] = Form(None),
     user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -88,6 +95,11 @@ async def upload(
         current_user=user,
         uploader_user_id=uploader_user_id,
     )
+    research_metadata = _validate_research_metadata(
+        workspace_slug=workspace_slug,
+        research_project_id=research_project_id,
+        chain_node_id=chain_node_id,
+    )
     try:
         record = await handle_upload(
             session=session,
@@ -96,12 +108,50 @@ async def upload(
             uploader_user_id=upload_user.user_id,
             uploader_username=upload_user.username,
             uploader_organization=upload_user.organization,
+            workspace_slug=research_metadata["workspace_slug"],
+            research_project_id=research_metadata["research_project_id"],
+            chain_node_id=research_metadata["chain_node_id"],
             max_size_bytes=settings.upload_max_size_mb * 1024 * 1024,
             allowed_types=settings.allowed_file_types_set,
         )
     except UploadError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
     return _to_dict(record)
+
+
+def _validate_research_metadata(
+    *,
+    workspace_slug: Optional[str],
+    research_project_id: Optional[str],
+    chain_node_id: Optional[str],
+) -> dict[str, str]:
+    """校验 Plane 传入的课题 metadata；全部缺省兼容旧客户端。
+
+    Args:
+        workspace_slug: Plane Workspace slug。
+        research_project_id: Plane 课题 ID。
+        chain_node_id: Plane Chain Node ID。
+
+    Returns:
+        规范化后的三项 metadata。
+
+    Raises:
+        HTTPException: 任一项存在但三项不完整，或格式不合法。
+    """
+    values = (workspace_slug or "").strip(), (research_project_id or "").strip(), (chain_node_id or "").strip()
+    if not any(values):
+        return {"workspace_slug": "", "research_project_id": "", "chain_node_id": ""}
+    workspace, project_id, node_id = values
+    if not all(values):
+        raise HTTPException(status_code=422, detail="research metadata must contain workspace_slug, research_project_id and chain_node_id")
+    if not 1 <= len(workspace) <= 64 or not all(char.isalnum() or char in "-_" for char in workspace):
+        raise HTTPException(status_code=422, detail="workspace_slug is invalid")
+    try:
+        UUID(project_id)
+        UUID(node_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="research IDs must be UUIDs") from exc
+    return {"workspace_slug": workspace, "research_project_id": project_id, "chain_node_id": node_id}
 
 
 @router.get("/mine")
