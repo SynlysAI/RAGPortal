@@ -36,6 +36,7 @@ def _to_dict(u: Upload) -> dict:
         "file_hash": u.file_hash,
         "parse_status": u.parse_status,
         "parse_error": u.parse_error,
+        "task_id": u.weknora_task_id,
         "uploaded_at": u.uploaded_at,
     }
 
@@ -85,6 +86,7 @@ async def upload(
     workspace_slug: Optional[str] = Form(None),
     research_project_id: Optional[str] = Form(None),
     chain_node_id: Optional[str] = Form(None),
+    file_sha256: Optional[str] = Form(None),
     user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -111,6 +113,7 @@ async def upload(
             workspace_slug=research_metadata["workspace_slug"],
             research_project_id=research_metadata["research_project_id"],
             chain_node_id=research_metadata["chain_node_id"],
+            file_sha256=(file_sha256 or "").strip(),
             max_size_bytes=settings.upload_max_size_mb * 1024 * 1024,
             allowed_types=settings.allowed_file_types_set,
         )

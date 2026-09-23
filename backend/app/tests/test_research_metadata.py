@@ -28,6 +28,7 @@ def test_upload_accepts_complete_research_metadata(monkeypatch):
             file_name="paper.pdf",
             file_type="pdf",
             file_size=4,
+            weknora_task_id="task-1",
             parse_status="pending",
         )
 
@@ -49,6 +50,7 @@ def test_upload_accepts_complete_research_metadata(monkeypatch):
                     "workspace_slug": "pi-lab",
                     "research_project_id": "11111111-1111-1111-1111-111111111111",
                     "chain_node_id": "22222222-2222-2222-2222-222222222222",
+                    "file_sha256": "a" * 64,
                 },
                 files={"file": ("paper.pdf", b"pdf", "application/pdf")},
             )
@@ -57,7 +59,9 @@ def test_upload_accepts_complete_research_metadata(monkeypatch):
         assert payload["workspace_slug"] == "pi-lab"
         assert payload["research_project_id"] == "11111111-1111-1111-1111-111111111111"
         assert payload["chain_node_id"] == "22222222-2222-2222-2222-222222222222"
+        assert payload["task_id"] == "task-1"
         assert captured["research_project_id"] == payload["research_project_id"]
+        assert captured["file_sha256"] == "a" * 64
     finally:
         app.dependency_overrides.clear()
 
@@ -87,3 +91,42 @@ def test_upload_rejects_partial_research_metadata():
 async def _empty_session():
     """空数据库依赖。"""
     yield None
+
+
+async def test_upload_rejects_sha256_mismatch(monkeypatch):
+    """metadata sha256 与实际文件不一致时必须在调用 WeKnora 前拒绝。"""
+    from io import BytesIO
+
+    from starlette.datastructures import UploadFile
+
+    from app.services import upload_service
+
+    async def allowed_kb(_kb_id: str) -> bool:
+        """测试中允许任意 KB。"""
+        return True
+
+    async def find_kb(_kb_id: str):
+        """测试中不需要 KB 名称。"""
+        return {}
+
+    monkeypatch.setattr(upload_service, "is_kb_allowed", allowed_kb)
+    monkeypatch.setattr(upload_service, "find_kb", find_kb)
+    upload = UploadFile(file=BytesIO(b"different"), filename="paper.md", headers=None)
+
+    try:
+        await upload_service.handle_upload(
+            session=None,
+            kb_id="kb-1",
+            file=upload,
+            uploader_user_id="u1",
+            uploader_username="alice",
+            uploader_organization="R&D",
+            file_sha256="b" * 64,
+            max_size_bytes=1024,
+            allowed_types={"md"},
+        )
+    except upload_service.UploadError as exc:
+        assert exc.status_code == 400
+        assert "sha256" in exc.message
+    else:
+        raise AssertionError("sha256 mismatch should be rejected")

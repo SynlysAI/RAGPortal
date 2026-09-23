@@ -1,4 +1,6 @@
 """上传业务逻辑:WeKnora 调用 + SQLite 双写。"""
+import hashlib
+
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +34,7 @@ async def handle_upload(
     workspace_slug: str = "",
     research_project_id: str = "",
     chain_node_id: str = "",
+    file_sha256: str = "",
     max_size_bytes: int,
     allowed_types: set[str],
 ) -> Upload:
@@ -51,6 +54,10 @@ async def handle_upload(
     ext = _file_extension(file.filename or "")
     if ext not in allowed_types:
         raise UploadError(400, f"不支持的文件类型:{ext}")
+
+    actual_sha256 = hashlib.sha256(file_bytes).hexdigest()
+    if file_sha256 and file_sha256.lower() != actual_sha256:
+        raise UploadError(400, "文件 sha256 与 metadata 不一致")
 
     try:
         weknora_resp = await weknora_upload_file(
@@ -87,7 +94,7 @@ async def handle_upload(
         file_name=file.filename or "untitled",
         file_type=ext,
         file_size=len(file_bytes),
-        file_hash=str(weknora_resp.get("file_hash") or "").strip(),
+        file_hash=str(weknora_resp.get("file_hash") or actual_sha256).strip(),
         parse_status="pending",
         parse_error="",
         weknora_task_id=weknora_resp.get("task_id", ""),
