@@ -79,6 +79,7 @@ export default function NavBar() {
                       <div className="text-sm font-semibold text-slate-800">{user.username}</div>
                       <div className="mt-0.5 text-xs text-slate-500">{user.organization || '—'}</div>
                     </div>
+                    <Link to="/api-tokens" className="block px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50">API Token</Link>
                     <button
                       onClick={handleLogout}
                       className="w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"

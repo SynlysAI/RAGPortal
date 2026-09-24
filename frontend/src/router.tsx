@@ -8,6 +8,7 @@ import MyUploadsPage from '@/pages/MyUploadsPage'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import KbRequestsPage from '@/pages/admin/KbRequestsPage'
 import UploadsAdminPage from '@/pages/admin/UploadsAdminPage'
+import ApiTokensPage from '@/pages/ApiTokensPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitialized } = useAuthStore()
@@ -32,6 +33,10 @@ export const router = createBrowserRouter([
       {
         path: '/my-uploads',
         element: <AuthGuard><MyUploadsPage /></AuthGuard>,
+      },
+      {
+        path: '/api-tokens',
+        element: <AuthGuard><ApiTokensPage /></AuthGuard>,
       },
       {
         path: '/admin',
