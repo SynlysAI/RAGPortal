@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """构建 FastAPI 实例并挂载路由。"""
     settings = get_settings()
-    app = FastAPI(title="RAGPortal", version="0.1.1", lifespan=lifespan)
+    app = FastAPI(title="RAGPortal", version="0.1.2", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
