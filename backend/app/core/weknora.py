@@ -93,6 +93,27 @@ async def get_knowledge(knowledge_id: str) -> dict[str, Any]:
     return data.get("data") or data
 
 
+async def search_knowledge(*, kb_id: str, query: str, top_k: int = 5) -> dict[str, Any]:
+    """代理 WeKnora 知识库语义检索。"""
+    async with _client() as c:
+        resp = await c.post(
+            f"/api/v1/knowledge-bases/{kb_id}/search",
+            json={"query": query, "top_k": max(1, min(top_k, 20))},
+        )
+    if resp.status_code != 200:
+        raise WeknoraError(resp.status_code, "WeKnora 检索失败", _safe_json(resp))
+    return _safe_json(resp).get("data") or _safe_json(resp)
+
+
+async def download_knowledge_file(knowledge_id: str) -> tuple[bytes, str]:
+    """下载 WeKnora 中 knowledge 对应的原始文件。"""
+    async with _client() as c:
+        resp = await c.get(f"/api/v1/knowledge/{knowledge_id}/file")
+    if resp.status_code != 200:
+        raise WeknoraError(resp.status_code, "下载文档失败", _safe_json(resp))
+    return resp.content, resp.headers.get("content-type", "application/octet-stream")
+
+
 async def list_knowledge_page(
     kb_id: str,
     page: int = 1,

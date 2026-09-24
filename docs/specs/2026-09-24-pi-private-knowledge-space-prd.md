@@ -3,7 +3,7 @@
 | 项目 | 内容 |
 |------|------|
 | 文档日期 | 2026-09-24 |
-| 文档版本 | v0.2 |
+| 文档版本 | v0.3 |
 | 产品名称 | RAGPortal PI 私有科研资料库与 Agent 访问网关 |
 | 文档类型 | 产品需求文档(PRD) |
 | 当前项目 | RAGPortal |
@@ -875,6 +875,34 @@ RAGPortal 的界面应定位为安静、克制、学术、可信的资料库管�
 8. 是否需要为文献 PDF 自动抽取元数据并与 Markdown 笔记建立关联?
 
 ## 17. 结论
+
+## 18. 账户级 API Token 与 MCP 接入补充
+
+根据 WorkBuddy 接入验证结果，一期 Agent 接入方式调整为账户级 API Token。用户登录 RAGPortal 后，可以在管理页面创建多个 Token，并为每个 Token 单独勾选权限。Token 绑定创建者账户，撤销后立即失效；明文仅在创建响应中显示一次，RAGPortal 数据库只保存 Token 摘要。
+
+### 18.1 Token 权限
+
+第一版权限包括 `documents:list`、`documents:search`、`documents:read`、`documents:download`、`documents:write` 和 `documents:update`。默认只勾选只读权限，写入和更新必须由用户主动开启。RAGPortal 服务端负责最终权限判断，SKILL 只负责保存配置并携带 Token。
+
+### 18.2 MCP 配置
+
+WorkBuddy 使用远程 Streamable HTTP MCP：
+
+```json
+{
+  "mcpServers": {
+    "ragportal": {
+      "type": "streamable-http",
+      "url": "https://ragportal.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+MCP 服务提供 `rag_list_documents`、`rag_search`、`rag_get_document`、`rag_download_file` 和 `rag_upload_document`。WorkBuddy 不接触 AI4MS 密码、WeKnora API Key、SQLite 或其他内部数据库。所有检索、读取、下载、写入和拒绝访问均应记录审计事件。
 
 本需求的技术路线是:
 

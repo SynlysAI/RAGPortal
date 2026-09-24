@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse
 from app.api.v1.admin import router as admin_router
 from app.api.v1.admin_kb_requests import router as admin_kb_requests_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.api_tokens import router as api_tokens_router
+from app.api.mcp import router as mcp_router
 from app.api.v1.config import router as config_router
 from app.api.v1.kb import router as kb_router
 from app.api.v1.kb_requests import router as kb_requests_router
@@ -27,7 +29,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """构建 FastAPI 实例并挂载路由。"""
     settings = get_settings()
-    app = FastAPI(title="RAGPortal", version="0.1.2", lifespan=lifespan)
+    app = FastAPI(title="RAGPortal", version="0.2.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -36,6 +38,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(auth_router)
+    app.include_router(api_tokens_router)
+    app.include_router(mcp_router)
     app.include_router(config_router)
     app.include_router(kb_router)
     app.include_router(kb_requests_router)
