@@ -43,9 +43,14 @@ async def handle_upload(
     Raises:
         UploadError: 业务校验失败(权限/大小/类型/重复/上游错误)。
     """
-    if not await is_kb_allowed(kb_id):
-        raise UploadError(403, "无权上传到此知识库")
-    kb = await find_kb(kb_id)
+    try:
+        if not await is_kb_allowed(kb_id):
+            raise UploadError(403, "无权上传到此知识库")
+        kb = await find_kb(kb_id)
+    except WeknoraError as exc:
+        if exc.status == 401:
+            raise UploadError(401, "WeKnora 认证失败，请检查 API Key") from exc
+        raise UploadError(exc.status, exc.message) from exc
 
     file_bytes = await file.read()
     if len(file_bytes) > max_size_bytes:

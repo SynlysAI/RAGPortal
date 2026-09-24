@@ -101,6 +101,65 @@ async def test_upload_file_raises_on_duplicate_409(monkeypatch):
     assert exc.value.status == 409
 
 
+async def test_handle_upload_translates_weknora_auth_failure(monkeypatch):
+    """WeKnora 401 must surface as a Chinese 401 business error."""
+    from io import BytesIO
+
+    from starlette.datastructures import UploadFile
+
+    from app.core.weknora import WeknoraError
+    from app.services import upload_service
+
+    async def invalid_key(_kb_id: str) -> bool:
+        raise WeknoraError(401, "拉取知识库列表失败")
+
+    monkeypatch.setattr(upload_service, "is_kb_allowed", invalid_key)
+    upload = UploadFile(file=BytesIO(b"paper"), filename="paper.md", headers=None)
+
+    try:
+        await upload_service.handle_upload(
+            session=None,
+            kb_id="kb-1",
+            file=upload,
+            uploader_user_id="u1",
+            uploader_username="alice",
+            uploader_organization="",
+            max_size_bytes=1024,
+            allowed_types={"md"},
+        )
+    except upload_service.UploadError as exc:
+        assert exc.status_code == 401
+        assert "认证失败" in exc.message
+    else:
+        raise AssertionError("WeKnora auth failure should be translated")
+
+
+def test_kb_list_translates_weknora_auth_failure(monkeypatch):
+    """The KB-list BFF also returns a Chinese 401 business response."""
+    from fastapi.testclient import TestClient
+
+    from app.api.v1.auth import UserInfo, get_current_user
+    from app.api.v1 import kb as kb_api
+    from app.core.weknora import WeknoraError
+    from app.main import app
+
+    async def invalid_key(refresh: bool = False):
+        raise WeknoraError(401, "拉取知识库列表失败")
+
+    monkeypatch.setattr(kb_api, "get_kb_list", invalid_key)
+    app.dependency_overrides[get_current_user] = lambda: UserInfo(
+        user_id="user-1", username="alice", role="user", status="active"
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/kb/list")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+    assert "认证失败" in response.json()["detail"]
+
+
 def httpx_client_class():
     """返回 httpx.AsyncClient 类(供 monkeypatch 用)。"""
     import httpx
