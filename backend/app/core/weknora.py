@@ -185,4 +185,6 @@ async def upload_file(
             _safe_json(resp).get("detail", "上传失败"),
             _safe_json(resp),
         )
-    return _extract_response_data(_safe_json(resp))
+    receipt = _extract_response_data(_safe_json(resp))
+    receipt.setdefault("task_id", receipt.get("id", ""))
+    return receipt

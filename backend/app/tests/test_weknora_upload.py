@@ -40,6 +40,7 @@ async def test_upload_file_injects_uploader_metadata(monkeypatch):
     )
 
     assert result["id"] == "k-1"
+    assert result["task_id"] == "k-1"
     metadata_raw = captured["data"].get("metadata")
     meta = json.loads(metadata_raw)
     assert meta["uploader_id"] == "u1"
