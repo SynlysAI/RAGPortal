@@ -57,6 +57,18 @@ def _migrate_uploads_table(sync_conn) -> None:
         sync_conn, columns, "uploads", "chain_node_id",
         "VARCHAR(64) NOT NULL DEFAULT ''",
     )
+    _add_column_if_missing(
+        sync_conn, columns, "uploads", "org_unit_id",
+        "VARCHAR(64) NOT NULL DEFAULT ''",
+    )
+    _add_column_if_missing(
+        sync_conn, columns, "uploads", "org_unit_name",
+        "VARCHAR(255) NOT NULL DEFAULT ''",
+    )
+    _add_column_if_missing(
+        sync_conn, columns, "uploads", "chain_id",
+        "VARCHAR(64) NOT NULL DEFAULT ''",
+    )
     sync_conn.execute(
         text(
             "CREATE INDEX IF NOT EXISTS idx_uploads_research_project "
@@ -64,6 +76,9 @@ def _migrate_uploads_table(sync_conn) -> None:
         )
     )
     sync_conn.execute(text("CREATE INDEX IF NOT EXISTS idx_uploads_kb_hash ON uploads (kb_id, file_hash)"))
+    sync_conn.execute(
+        text("CREATE INDEX IF NOT EXISTS idx_uploads_org_unit ON uploads (org_unit_id, chain_id)")
+    )
 
 
 def _migrate_kb_requests_table(sync_conn) -> None:

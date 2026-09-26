@@ -46,6 +46,7 @@ async def test_upload_file_injects_uploader_metadata(monkeypatch):
     assert meta["uploader_id"] == "u1"
     assert meta["uploader_name"] == "alice"
     assert meta["uploader_org"] == "R&D"
+    assert "org_unit_id" not in meta
     assert captured["data"].get("fileName") == "sub/report.pdf"
     assert captured["files"]["file"][0] == "report.pdf"
     # files 第二项可能是 bytes 或 file-like
@@ -164,3 +165,44 @@ def httpx_client_class():
     """返回 httpx.AsyncClient 类(供 monkeypatch 用)。"""
     import httpx
     return httpx.AsyncClient
+
+
+async def test_upload_file_forwards_group_metadata(monkeypatch):
+    """完整小组追溯字段写入 WeKnora metadata，缺省字段不写入。"""
+    captured: dict = {}
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {"data": {"id": "k-2", "parse_status": "pending"}, "success": True}
+
+    async def fake_post(self, url, **kwargs):
+        captured["data"] = kwargs.get("data")
+        return FakeResp()
+
+    monkeypatch.setattr(httpx_client_class(), "post", fake_post)
+    await weknora.upload_file(
+        kb_id="kb-team",
+        file_bytes=b"hello",
+        file_name="paper.md",
+        file_size=5,
+        uploader_user_id="u1",
+        uploader_username="alice",
+        uploader_organization="R&D",
+        research_metadata={
+            "workspace_slug": "pi-lab",
+            "research_project_id": "11111111-1111-1111-1111-111111111111",
+            "chain_node_id": "22222222-2222-2222-2222-222222222222",
+            "org_unit_id": "33333333-3333-3333-3333-333333333333",
+            "org_unit_name": "电池",
+            "chain_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "unused": "",
+        },
+    )
+    meta = json.loads(captured["data"]["metadata"])
+    assert meta["org_unit_id"] == "33333333-3333-3333-3333-333333333333"
+    assert meta["org_unit_name"] == "电池"
+    assert meta["chain_id"] == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert meta["workspace_slug"] == "pi-lab"
+    assert "unused" not in meta

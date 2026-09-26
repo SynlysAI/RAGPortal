@@ -136,9 +136,9 @@ RAGPortal 不承担:
 
 #### 场景一:PI 建立私有资料库并申请知识库
 
-创建 `RESEARCH_CHAIN` 课题时，Plane 必须在同一业务流程中创建独立的 Plane Project，并自动向 RAGPortal 提交该课题的独立知识库申请。RAGPortal 只创建申请，不直接创建 WeKnora 知识库。课题和 Plane Project 可以先创建成功，知识库申请状态置为 `PENDING_ADMIN`，管理员完成 WeKnora 手工建库和回填前，课题页显示“知识库申请处理中”，不开放外部 KB 上传和检索。
+创建 `RESEARCH_CHAIN` 课题时，Plane 仍创建独立的 Plane Project，但不再为每个课题申请独立知识库。课题挂到负责人所属 `TEAM` 小组的共享知识库：同一小组只保留一条申请。RAGPortal 只保存上传追溯 metadata，不直接创建 WeKnora 知识库，也不把学生课题写入个人建库申请。小组申请状态为 `PENDING_ADMIN` 时，课题页显示“小组知识库申请处理中”，不开放上传；回填完成后，本组后续课题直接进入该库。没有小组归属时不创建个人库。
 
-目标 PI 登录 RAGPortal 后，系统为其创建或绑定默认个人空间。该空间归属于这个具体用户，用于保存文献、资料、Markdown 笔记和附件。课题知识库申请与个人空间申请共用申请、通知、回填和审计模型，但 `RESEARCH_CHAIN` 课题申请为强制动作，不允许由用户跳过。
+目标 PI 登录 RAGPortal 后，系统为其创建或绑定默认个人空间。该空间归属于这个具体用户，用于保存文献、资料、Markdown 笔记和附件。学生课题不再进入这套个人建库申请。小组库由 Plane 按 `TEAM` 绑定，管理员在 Plane 回填 WeKnora 知识库；RAGPortal 只接收上传并保存追溯 metadata。
 
 申请至少记录：
 
@@ -157,7 +157,7 @@ REQUESTED → PENDING_ADMIN → CREATED_PENDING_BINDING → READY
                          ↘ NEEDS_INFO / REJECTED
 ```
 
-课题可以在 KB 申请处理期间继续创建和记录研究过程，但知识上传入口必须显示“知识库申请处理中”，不能伪装成上传成功。申请处理完成后，RAGPortal 将外部 KB 绑定状态回传 Plane，Plane 再开放对应课题的上传和检索能力。
+课题可以在小组库尚未回填时继续创建和记录研究过程，但上传入口必须显示小组名称和处理状态，不能伪装成上传成功。Plane 回填完成前不向 RAGPortal 发起外部上传。回填后，同一小组的后续课题直接进入该库。
 
 #### 场景二:PI 从 Obsidian 导入资料
 
@@ -531,7 +531,7 @@ RAGPortal 空间可以映射到一个或多个 WeKnora KB。映射关系由 RAGP
 
 #### FR-SP-05 课题创建自动申请
 
-创建 `RESEARCH_CHAIN` 课题时，Plane 必须自动提交一个独立的 RAGPortal 知识库申请。申请必须幂等，同一 workspace/project/chain 在未结束的申请期间不得重复创建相同申请。课题创建不得等待管理员完成 WeKnora 建库；课题先以 `PENDING_ADMIN` 状态可用，申请页面和课题页应显示：
+创建 `RESEARCH_CHAIN` 课题时，Plane 按小组幂等挂接共享知识库，不再按课题重复申请。同一小组未结束期间只有一条申请。课题创建不得等待管理员完成 WeKnora 建库；小组尚待绑定时课题页应显示：
 
 - 申请状态和当前处理人
 - 申请所需业务参数和缺失项
@@ -539,7 +539,7 @@ RAGPortal 空间可以映射到一个或多个 WeKnora KB。映射关系由 RAGP
 - WeKnora 知识库 ID 回填后的绑定结果
 - Plane project、research chain 和申请之间的关联
 
-个人空间申请可以由 RAGPortal 管理界面发起，但不能替代 `RESEARCH_CHAIN` 课题创建时的自动申请。
+个人空间申请可以由 RAGPortal 管理界面发起，但不能代替 Plane 上的小组知识库绑定，也不能把学生课题写成个人建库申请。
 
 #### FR-SP-06 管理员手工建库回填
 
@@ -551,7 +551,7 @@ RAGPortal 不保存或展示 WeKnora 管理凭证，不把无法确认的 KB ID 
 
 课题 KB 的可见范围由课题所属组织架构继承。默认可见主体包括：学生 owner、直接导师、产业化负责人、基础研究负责人和课题组主 PI；组织架构中位于这些负责人上级的领导按组织继承规则可见。课题组主 PI 同时是平台配置中的唯一 `Main PI`，二者不是两个独立身份。
 
-RAGPortal 保存 Plane 传入的组织路径、角色和授权版本，按绑定后的 ACL 过滤 KB、文档、检索结果和下载请求。WeKnora 全局 API key 的可见范围不能扩大上述业务授权。
+组内检索不做课题隔离：小组成员可检索整个小组库，上传 metadata 只记录小组、课题和节点。Plane 上的课题可见性和上传回执仍按课题 ACL。组外协作者、仅有审阅关系的导师不能因此检索整个小组库。RAGPortal 不按课题 metadata 裁剪 WeKnora 检索结果，WeKnora 全局 API key 也不能扩大上述授权。
 
 ### 8.2 资料导入
 
@@ -887,7 +887,7 @@ RAGPortal 的界面应定位为安静、克制、学术、可信的资料库管�
 
 验收重点:
 
-- `RESEARCH_CHAIN` 课题创建时自动创建 Plane Project 并生成唯一知识库申请，课题先进入 `PENDING_ADMIN`
+- `RESEARCH_CHAIN` 课题创建时自动创建 Plane Project，并挂到所属小组的唯一知识库申请；小组未就绪时进入 `PENDING_ADMIN`
 - AI4MS/Plane 管理员收到通知并能在 WeKnora 手工建库后回填，回填校验通过后课题进入 `READY`
 - 未达到 `READY` 前不允许上传到外部 KB，但源文件和人工记录不丢失
 - 学生、直接导师、产业化负责人、基础研究负责人、课题组主 PI 及组织架构上级领导按继承规则访问课题 KB
@@ -1011,5 +1011,6 @@ RAGPortal 的界面应定位为安静、克制、学术、可信的资料库管�
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v0.4 | 2026-09-25 | 明确 RESEARCH_CHAIN 课题强制创建独立 Plane Project 并自动提交 KB 申请；补充 PENDING_ADMIN、唯一 Main PI、组织继承可见范围、管理员维护职责、真实 OIDC/SSO 和 Plane review Agent 与 WorkBuddy 只读边界 |
+| v0.5 | 2026-09-26 | 学生课题从一题一库改为小组共享库。同一 `TEAM` 只建一次 WeKnora 知识库，组内全文可检索；新课题挂到该库。已 READY 的历史课题绑定不并库。上传增加可选的小组、课题追溯字段。PI 个人空间不变，RAGPortal 仍不自动建库。 |
 | v0.3 | 2026-09-25 | 明确 RAGPortal 不直接创建 WeKnora 知识库；新增知识库申请、管理员通知、WeKnora 手工建库回填、绑定状态、失败补偿和验收流程 |
 | v0.2 | 2026-09-24 | 初始 PRD |
