@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # CORS
     frontend_origin: str = "http://localhost:3002"
+    mcp_public_base_url: str = ""
 
     # 部署
     app_env: str = "development"

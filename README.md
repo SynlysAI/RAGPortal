@@ -28,7 +28,29 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 
 外部 MCP 客户端只访问 RAGPortal，不能直接访问 WeKnora、数据库或 AI4MS 密码。创建 Token 时必须绑定知识库，并勾选文档列表、检索、读取、下载和写入等权限。
 
-客户端调用顺序建议为：先调用 `rag_list_knowledge_bases` 获取该 Token 可访问的知识库，再把返回的 `kb_id` 传给 `rag_search`。`rag_list_documents` 可列出当前账户在该知识库的上传记录。未绑定的知识库不会出现在列表中，也不能被检索、读取、下载或写入。
+`rag_search` 不传 `kb_id` 或 `kb_ids` 时检索 Token 绑定的全部知识库。需要限定范围时，可以先调用 `rag_list_knowledge_bases` 获取 ID，再传 `kb_id`（单库）或 `kb_ids`（多库）；两种范围参数不能同时提供。未绑定的库不能被检索。
+
+```json
+{"query": "实验条件", "top_k": 10}
+```
+
+```json
+{"query": "实验条件", "kb_ids": ["kb-a", "kb-b"], "top_k": 10}
+```
+
+`top_k` 是最终结果总数（1 到 20，默认 5）。跨库按各库内部排名交错合并，不直接比较不同库的分数；每条命中带 `kb_id`、`kb_name` 和原始文档来源字段。部分库失败时返回 `partial: true` 和 `errors`，全部失败则返回错误。
+
+`rag_list_knowledge_bases` 从 WeKnora 读取知识库列表并按 Token 绑定范围过滤；`rag_list_documents` 直接从 WeKnora 分页列出指定知识库的全部文档（`kb_id` 必填，`page`、`page_size` 可选）。列表中的 `document_id` 是 WeKnora 文档 ID，可继续传给 `rag_get_document` 和 `rag_download_file`。RAGPortal 本地 `uploads` 表仅用于门户上传日志，不作为 MCP 文档清单的数据源。
+
+所有 MCP 文档工具统一使用 WeKnora 文档 ID（字符串）作为 `document_id`。`rag_search` 的每条命中和 `rag_upload_document` 的返回值都提供该字段；上传结果另用 `upload_id` 表示 RAGPortal 本地记录 ID，并保留 `knowledge_id` 兼容原有调用。
+
+检索命中包含 WeKnora `image_info` 时，RAGPortal 会在原有结构化检索结果之外附带 MCP `image` 内容块。图片由后端在已授权知识库内读取，最多返回 3 张、每张最多 2 MB，只接受 JPEG、PNG、WebP 和 GIF。`resource://` 引用不能直接作为 Markdown 图片地址；外部客户端是否把 `image` 内容块显示在对话中，取决于客户端自身支持情况。
+
+### 短期文件下载
+
+`rag_download_file` 使用当前 API Token 签发仅针对指定文档的下载链接，返回 `download_url`、`expires_at` 和文件名。链接有效期为 10 分钟，期间可重复访问；打开链接无需再提供 API Token。服务端每次访问都会重新检查原 Token 是否有效、是否仍有下载权限、知识库绑定是否保留，以及 WeKnora 文档是否仍属于该知识库。过期后重新调用工具即可获取新链接。原 `/api/mcp/files/{document_id}` Bearer 下载入口仍可用。
+
+在生产环境配置 `MCP_PUBLIC_BASE_URL=https://你的 RAGPortal 域名`，不配置时回退到 `FRONTEND_ORIGIN`。外网下载链接必须使用 HTTPS。下载凭证明文只出现在短期链接中，数据库仅保存摘要；不要将完整下载 URL 写入日志或长期保存。
 
 ## 设计文档
 
@@ -68,10 +90,19 @@ pm2 save
 
 ## Nginx 反向代理(示例)
 
+生产环境须在 Nginx 或上层代理启用 HTTPS；下例只展示反向代理路径，不能单独作为短期下载链接的 TLS 配置。
+
 ```nginx
 server {
     listen 80;
     server_name rag.xmuzc.com;
+
+    location /api/mcp/downloads/ {
+        access_log off;
+        proxy_pass http://127.0.0.1:8004;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:8004;

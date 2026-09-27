@@ -2,17 +2,18 @@
 
 import json
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.core.weknora import download_knowledge_file
-from app.models.upload import Upload
+from app.core.weknora import WeknoraError, download_knowledge_file, get_knowledge
 from app.services.api_token_service import verify_api_token
+from app.services.download_ticket_service import resolve_download_ticket
 from app.services.mcp_service import TOOL_PERMISSIONS, call_tool, get_tool_definitions
+from app.services.mcp_images import search_image_blocks
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -81,16 +82,20 @@ async def mcp_endpoint(
             tool_name=tool_name,
             arguments=params.get("arguments") or {},
             allowed_knowledge_base_ids=allowed_knowledge_base_ids,
+            api_token_id=token.id,
         )
     except ValueError as exc:
         return _jsonrpc_error(request_id, -32602, str(exc))
     except Exception as exc:
         return _jsonrpc_error(request_id, -32000, f"Tool 执行失败: {exc}")
+    content = [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]
+    if tool_name == "rag_search":
+        content.extend(await search_image_blocks(result))
     return {
         "jsonrpc": "2.0",
         "id": request_id,
         "result": {
-            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
+            "content": content,
             "structuredContent": result,
         },
     }
@@ -98,7 +103,7 @@ async def mcp_endpoint(
 
 @router.get("/files/{document_id}")
 async def download_file(
-    document_id: int,
+    document_id: str,
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
@@ -107,19 +112,62 @@ async def download_file(
     authorization = request.headers.get("Authorization", "")
     if await verify_api_token(session, authorization[7:].strip(), "documents:download") is None:
         raise HTTPException(status_code=403, detail="Token 没有文件下载权限")
-    result = await session.execute(
-        select(Upload).where(
-            Upload.id == document_id,
-            Upload.uploader_user_id == token.user_id,
-        )
-    )
-    upload = result.scalar_one_or_none()
+    knowledge = await get_knowledge(document_id)
     allowed_knowledge_base_ids = set(json.loads(token.knowledge_base_ids_json or "[]"))
-    if upload is None or upload.kb_id not in allowed_knowledge_base_ids:
+    if knowledge.get("knowledge_base_id") not in allowed_knowledge_base_ids:
         raise HTTPException(status_code=404, detail="文档不存在或无权访问")
-    content, media_type = await download_knowledge_file(upload.knowledge_id)
+    return await _download_response(document_id, knowledge)
+
+
+@router.get("/downloads/{ticket_secret}")
+async def download_from_ticket(
+    ticket_secret: str,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """使用短期凭证下载单个已授权文件，无需长期 API Token。
+
+    Args:
+        ticket_secret: 签发时返回的一次性明文凭证。
+        session: 数据库会话。
+
+    Returns:
+        文档原始文件响应。
+    """
+    ticket = await resolve_download_ticket(session, ticket_secret)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="下载链接无效或已过期")
+    try:
+        knowledge = await get_knowledge(ticket.knowledge_id)
+    except WeknoraError as exc:
+        if exc.status == 404:
+            raise HTTPException(status_code=404, detail="文档不存在") from exc
+        raise HTTPException(status_code=502, detail="文档服务暂不可用") from exc
+    if knowledge.get("knowledge_base_id") != ticket.kb_id:
+        raise HTTPException(status_code=404, detail="文档不存在或无权访问")
+    return await _download_response(ticket.knowledge_id, knowledge)
+
+
+async def _download_response(document_id: str, knowledge: dict) -> Response:
+    """代理 WeKnora 原文件并设置私密下载响应头。
+
+    Args:
+        document_id: WeKnora 文档 ID。
+        knowledge: 已完成授权校验的 WeKnora 文档详情。
+
+    Returns:
+        带文件名和禁止缓存标记的二进制响应。
+    """
+    content, media_type = await download_knowledge_file(document_id)
+    filename = knowledge.get("file_name") or knowledge.get("title") or document_id
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{upload.file_name}"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename*=UTF-8''{quote(filename, safe='')}"
+            ),
+            "Cache-Control": "private, no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+        },
     )

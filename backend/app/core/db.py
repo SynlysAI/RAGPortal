@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import get_settings
 from app.models import kb_request as _kb_request_model  # noqa: F401
 from app.models import api_token as _api_token_model  # noqa: F401
+from app.models import download_ticket as _download_ticket_model  # noqa: F401
 from app.models.upload import Base
 
 

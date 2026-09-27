@@ -886,6 +886,8 @@ RAGPortal 的界面应定位为安静、克制、学术、可信的资料库管�
 
 ### 18.2 MCP 配置
 
+`rag_search` 支持三种检索范围：不传范围时检索 Token 绑定的全部知识库；`kb_id` 指定单库；`kb_ids` 指定多个绑定库。两个范围参数不能同时提供，空范围和未授权范围必须在调用 WeKnora 前拒绝。`top_k` 表示最终结果总数（1 到 20，默认 5）。跨库最多 5 个并发调用，按各库内部排名交错合并，命中保留知识库 ID、名称和文档来源。部分失败返回明确的失败范围，全部失败返回错误。
+
 WorkBuddy 使用远程 Streamable HTTP MCP：
 
 ```json
@@ -902,7 +904,13 @@ WorkBuddy 使用远程 Streamable HTTP MCP：
 }
 ```
 
-MCP 服务提供 `rag_list_knowledge_bases`、`rag_list_documents`、`rag_search`、`rag_get_document`、`rag_download_file` 和 `rag_upload_document`。客户端应先调用 `rag_list_knowledge_bases` 查询 Token 绑定的知识库，再将返回的 `kb_id` 传给后续工具。未绑定的知识库不能被检索、读取、下载或写入。外部客户端不接触 AI4MS 密码、WeKnora API Key、SQLite 或其他内部数据库。所有检索、读取、下载、写入和拒绝访问均应记录审计事件。
+MCP 服务提供 `rag_list_knowledge_bases`、`rag_list_documents`、`rag_search`、`rag_get_document`、`rag_download_file` 和 `rag_upload_document`。知识库列表从 WeKnora 获取，再按 Token 绑定范围过滤；文档列表和详情也以 WeKnora 为数据源，文档 ID 使用 WeKnora knowledge ID。RAGPortal 的 uploads 表仅记录通过门户执行的上传，不代表知识库全部文档。未绑定的知识库不能被检索、读取、下载或写入。外部客户端不接触 AI4MS 密码、WeKnora API Key、SQLite 或其他内部数据库。所有检索、读取、下载、写入和拒绝访问均应记录审计事件。
+
+MCP 对外统一以 `document_id` 表示 WeKnora knowledge ID（字符串），用于检索命中、文档列表、详情、下载和上传返回值。上传时 RAGPortal 本地记录 ID 另以 `upload_id` 返回；`knowledge_id` 保留为兼容字段。
+
+检索图片由 WeKnora `image_info` 中的 `resource://` 引用定位，RAGPortal 仅在已授权知识库内读取位图，并在 MCP `tools/call` 的 `content` 中附加最多 3 个 `image` 内容块。单图上限 2 MB，格式限 JPEG、PNG、WebP、GIF；客户端是否可见由其 MCP 图片内容块支持情况决定。不能将 `resource://` 直接当作浏览器可访问的 Markdown 图片 URL。
+
+文件下载采用短期凭证：外部客户端携长期 API Token 调用 `rag_download_file`，RAGPortal 校验 `documents:download` 与文档所属知识库后签发仅针对该文档、有效期 10 分钟的随机下载凭证。响应返回完整 HTTPS `download_url` 和 `expires_at`，普通 GET 不要求 API Token。数据库只存凭证摘要；每次下载重新校验过期时间、原 Token 状态与权限、当前知识库绑定和 WeKnora 文档归属。短期链接在有效期内允许重复访问以兼容预览与重试，过期后须重新签发。响应禁止缓存；生产代理和应用访问日志不得记录完整下载 URL。
 
 本需求的技术路线是:
 
