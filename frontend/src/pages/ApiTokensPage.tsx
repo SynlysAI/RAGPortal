@@ -4,7 +4,7 @@ import { apiTokensApi, TOKEN_PERMISSIONS, type ApiToken } from '@/api/apiTokens'
 
 export default function ApiTokensPage() {
   const [tokens, setTokens] = useState<ApiToken[]>([])
-  const [name, setName] = useState('WorkBuddy')
+  const [name, setName] = useState('外部 MCP 客户端')
   const [permissions, setPermissions] = useState<string[]>(['documents:list', 'documents:search', 'documents:read', 'documents:download'])
   const [secret, setSecret] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,7 +31,7 @@ export default function ApiTokensPage() {
     try {
       const result = await apiTokensApi.create(name, permissions)
       setSecret(result.secret)
-      setName('WorkBuddy')
+      setName('外部 MCP 客户端')
       await load()
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Token 创建失败')
@@ -54,7 +54,7 @@ export default function ApiTokensPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-slate-900">API Token</h2>
-        <p className="mt-1 text-sm text-slate-500">为 WorkBuddy 或其他 MCP 客户端创建受控访问凭据。</p>
+        <p className="mt-1 text-sm text-slate-500">为外部 MCP 客户端创建受控访问凭据。</p>
       </div>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -73,7 +73,7 @@ export default function ApiTokensPage() {
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 text-base font-semibold text-slate-900"><KeyRound size={18} />创建 Token</div>
-        <label className="mt-4 block text-sm font-medium text-slate-700">名称<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="例如 WorkBuddy 只读" /></label>
+        <label className="mt-4 block text-sm font-medium text-slate-700">名称<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="例如 外部客户端只读" /></label>
         <div className="mt-4 text-sm font-medium text-slate-700">权限</div>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {TOKEN_PERMISSIONS.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm text-slate-700"><input type="checkbox" checked={permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} />{permission.label}<span className="ml-auto text-xs text-slate-400">{permission.key}</span></label>)}
@@ -89,7 +89,7 @@ export default function ApiTokensPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600"><div className="font-semibold text-slate-800">WorkBuddy MCP 配置</div><pre className="mt-3 overflow-x-auto rounded bg-slate-900 p-4 text-xs text-slate-100">{`{\n  "mcpServers": {\n    "ragportal": {\n      "type": "streamable-http",\n      "url": "https://你的域名/api/mcp",\n      "headers": {\n        "Authorization": "Bearer YOUR_API_TOKEN"\n      }\n    }\n  }\n}`}</pre></section>
+      <section className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600"><div className="font-semibold text-slate-800">MCP 客户端配置</div><pre className="mt-3 overflow-x-auto rounded bg-slate-900 p-4 text-xs text-slate-100">{`{\n  "mcpServers": {\n    "ragportal": {\n      "type": "streamable-http",\n      "url": "https://你的域名/api/mcp",\n      "headers": {\n        "Authorization": "Bearer YOUR_API_TOKEN"\n      }\n    }\n  }\n}`}</pre></section>
     </div>
   )
 }
