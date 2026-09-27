@@ -286,6 +286,36 @@ def test_search_hit_exposes_weknora_document_id(monkeypatch):
     assert result["items"][0]["knowledge_id"] == "wk-1"
 
 
+def test_search_result_excludes_internal_metadata_and_long_image_ocr(monkeypatch):
+    """检索只返回智能体所需字段，避免原始元数据撑爆工具结果。"""
+    monkeypatch.setattr(mcp_service, "search_knowledge", AsyncMock(return_value={
+        "items": [{
+            "id": "chunk-1",
+            "knowledge_id": "wk-1",
+            "knowledge_title": "实验论文",
+            "content": "前置推理</think>显微图像显示桥接缺陷。" + "后文" * 1000,
+            "matched_content": "重复内容" * 1000,
+            "metadata": {"process_overrides": "冗长内部配置" * 1000},
+            "image_info": '[{"url":"resource://abc123","caption":"桥接缺陷","ocr_text":"OCR"}]',
+            "score": 0.25,
+        }],
+    }))
+    monkeypatch.setattr(mcp_service, "get_kb_list", AsyncMock(return_value=[]))
+    result = asyncio.run(call_tool(
+        session=None, user_id="u1", tool_name="rag_search",
+        arguments={"query": "桥接缺陷", "kb_id": "bound"},
+        allowed_knowledge_base_ids={"bound"},
+    ))
+    hit = result["items"][0]
+    assert hit["document_id"] == "wk-1"
+    assert hit["knowledge_title"] == "实验论文"
+    assert hit["image_info"] == [{"_resource_path": "resource://abc123", "caption": "桥接缺陷"}]
+    assert hit["content"].startswith("显微图像显示桥接缺陷")
+    assert len(hit["content"]) <= 1000
+    assert "metadata" not in hit
+    assert "matched_content" not in hit
+
+
 def test_search_accepts_selected_libraries_and_removes_duplicates(monkeypatch):
     """kb_ids 仅检索指定绑定库且重复 ID 不重复调用。"""
     search_mock = AsyncMock(return_value={"items": []})

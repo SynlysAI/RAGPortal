@@ -15,6 +15,8 @@ class DownloadTicket(Base):
     api_token_id: Mapped[int] = mapped_column(Integer, nullable=False)
     knowledge_id: Mapped[str] = mapped_column(String(128), nullable=False)
     kb_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    ticket_type: Mapped[str] = mapped_column(String(16), nullable=False, default="document")
+    resource_path: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
     created_at: Mapped[str] = mapped_column(String(40), nullable=False)
     expires_at: Mapped[str] = mapped_column(String(40), nullable=False)
 

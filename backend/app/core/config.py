@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # CORS
     frontend_origin: str = "http://localhost:3002"
     mcp_public_base_url: str = ""
+    mcp_image_url_ttl_seconds: int = 2_592_000
 
     # 部署
     app_env: str = "development"

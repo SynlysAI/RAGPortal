@@ -10,6 +10,7 @@ from app.models.api_token import ApiToken
 from app.models.download_ticket import DownloadTicket
 from app.models.upload import Base
 from app.services.download_ticket_service import (
+    create_image_ticket,
     create_download_ticket,
     resolve_download_ticket,
 )
@@ -29,7 +30,7 @@ async def ticket_session():
             name="下载测试",
             token_prefix="rpt_test",
             token_hash="a" * 64,
-            permissions_json='["documents:download"]',
+            permissions_json='["documents:download", "documents:search"]',
             knowledge_base_ids_json='["kb-a"]',
             status="active",
             created_at=datetime.now(timezone.utc).isoformat(),
@@ -79,6 +80,20 @@ async def test_ticket_invalid_after_expiration_or_scope_change(ticket_session):
     token.knowledge_base_ids_json = '[]'
     await session.commit()
     assert await resolve_download_ticket(session, issued.secret) is None
+
+
+@pytest.mark.asyncio
+async def test_image_ticket_uses_configured_longer_ttl(ticket_session):
+    """图片 Markdown 凭证支持 30 天有效期并保存资源引用。"""
+    session, token = ticket_session
+    issued = await create_image_ticket(
+        session, token.id, "wk-1", "kb-a", "resource://image", 2_592_000,
+    )
+    stored = (await session.execute(select(DownloadTicket))).scalar_one()
+    assert stored.ticket_type == "image"
+    assert stored.resource_path == "resource://image"
+    assert issued.expires_at - datetime.now(timezone.utc) > timedelta(days=29)
+    assert (await resolve_download_ticket(session, issued.secret)).ticket_type == "image"
 
     token.knowledge_base_ids_json = '["kb-a"]'
     token.permissions_json = '[]'

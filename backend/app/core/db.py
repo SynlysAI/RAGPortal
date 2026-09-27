@@ -132,6 +132,23 @@ def _migrate_api_tokens_table(sync_conn) -> None:
     )
 
 
+def _migrate_download_tickets_table(sync_conn) -> None:
+    """补齐短期下载凭证的图片资源字段。"""
+    inspector = inspect(sync_conn)
+    try:
+        columns = {column["name"] for column in inspector.get_columns("download_tickets")}
+    except Exception:
+        columns = set()
+    _add_column_if_missing(
+        sync_conn, columns, "download_tickets", "ticket_type",
+        "VARCHAR(16) NOT NULL DEFAULT 'document'",
+    )
+    _add_column_if_missing(
+        sync_conn, columns, "download_tickets", "resource_path",
+        "VARCHAR(2048) NOT NULL DEFAULT ''",
+    )
+
+
 def _add_column_if_missing(sync_conn, columns, table: str, name: str, ddl: str) -> None:
     """若表的某列不存在则 ALTER TABLE 补齐。
 
@@ -154,6 +171,7 @@ async def init_db() -> None:
         await conn.run_sync(_migrate_uploads_table)
         await conn.run_sync(_migrate_kb_requests_table)
         await conn.run_sync(_migrate_api_tokens_table)
+        await conn.run_sync(_migrate_download_tickets_table)
 
 
 async def get_session() -> AsyncSession:

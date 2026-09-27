@@ -9,11 +9,17 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.core.weknora import WeknoraError, download_knowledge_file, get_knowledge
+from app.core.weknora import (
+    WeknoraError,
+    download_knowledge_file,
+    download_search_image,
+    get_knowledge,
+)
 from app.services.api_token_service import verify_api_token
 from app.services.download_ticket_service import resolve_download_ticket
 from app.services.mcp_service import TOOL_PERMISSIONS, call_tool, get_tool_definitions
-from app.services.mcp_images import search_image_blocks
+from app.services.mcp_images import search_image_markdown_blocks
+from app.services.mcp_search_service import format_search_text
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -88,9 +94,16 @@ async def mcp_endpoint(
         return _jsonrpc_error(request_id, -32602, str(exc))
     except Exception as exc:
         return _jsonrpc_error(request_id, -32000, f"Tool 执行失败: {exc}")
-    content = [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]
+    content = [{
+        "type": "text",
+        "text": (
+            format_search_text(result)
+            if tool_name == "rag_search"
+            else json.dumps(result, ensure_ascii=False)
+        ),
+    }]
     if tool_name == "rag_search":
-        content.extend(await search_image_blocks(result))
+        content.extend(await search_image_markdown_blocks(result, session, token.id))
     return {
         "jsonrpc": "2.0",
         "id": request_id,
@@ -134,7 +147,7 @@ async def download_from_ticket(
         文档原始文件响应。
     """
     ticket = await resolve_download_ticket(session, ticket_secret)
-    if ticket is None:
+    if ticket is None or getattr(ticket, "ticket_type", "document") != "document":
         raise HTTPException(status_code=404, detail="下载链接无效或已过期")
     try:
         knowledge = await get_knowledge(ticket.knowledge_id)
@@ -145,6 +158,51 @@ async def download_from_ticket(
     if knowledge.get("knowledge_base_id") != ticket.kb_id:
         raise HTTPException(status_code=404, detail="文档不存在或无权访问")
     return await _download_response(ticket.knowledge_id, knowledge)
+
+
+@router.get("/images/{ticket_secret}")
+async def image_from_ticket(
+    ticket_secret: str,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """使用短期图片凭证返回可嵌入 Markdown 的图片。
+
+    Args:
+        ticket_secret: 图片短期凭证明文。
+        session: 数据库会话。
+
+    Returns:
+        内联图片响应。
+    """
+    ticket = await resolve_download_ticket(session, ticket_secret)
+    if ticket is None or ticket.ticket_type != "image":
+        raise HTTPException(status_code=404, detail="图片链接无效或已过期")
+    try:
+        knowledge = await get_knowledge(ticket.knowledge_id)
+    except WeknoraError as exc:
+        if exc.status == 404:
+            raise HTTPException(status_code=404, detail="文档不存在") from exc
+        raise HTTPException(status_code=502, detail="文档服务暂不可用") from exc
+    if knowledge.get("knowledge_base_id") != ticket.kb_id:
+        raise HTTPException(status_code=404, detail="图片不存在或无权访问")
+    try:
+        content, media_type = await download_search_image(
+            ticket.kb_id, ticket.resource_path,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="图片资源无效") from exc
+    except WeknoraError as exc:
+        raise HTTPException(status_code=502, detail="图片服务暂不可用") from exc
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "private, no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def _download_response(document_id: str, knowledge: dict) -> Response:
