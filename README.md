@@ -26,7 +26,9 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 }
 ```
 
-WorkBuddy 只访问 RAGPortal，不能直接访问 WeKnora、数据库或 AI4MS 密码。Token 权限包括文档列表、检索、读取、下载和写入。
+外部 MCP 客户端只访问 RAGPortal，不能直接访问 WeKnora、数据库或 AI4MS 密码。创建 Token 时必须绑定知识库，并勾选文档列表、检索、读取、下载和写入等权限。
+
+客户端调用顺序建议为：先调用 `rag_list_knowledge_bases` 获取该 Token 可访问的知识库，再把返回的 `kb_id` 传给 `rag_search`。`rag_list_documents` 可列出当前账户在该知识库的上传记录。未绑定的知识库不会出现在列表中，也不能被检索、读取、下载或写入。
 
 ## 设计文档
 

@@ -882,7 +882,7 @@ RAGPortal 的界面应定位为安静、克制、学术、可信的资料库管�
 
 ### 18.1 Token 权限
 
-第一版权限包括 `documents:list`、`documents:search`、`documents:read`、`documents:download`、`documents:write` 和 `documents:update`。默认只勾选只读权限，写入和更新必须由用户主动开启。RAGPortal 服务端负责最终权限判断，SKILL 只负责保存配置并携带 Token。
+第一版权限包括 `knowledge-bases:list`、`documents:list`、`documents:search`、`documents:read`、`documents:download`、`documents:write` 和 `documents:update`。Token 创建时必须绑定一个或多个知识库；默认只勾选只读权限，写入和更新必须由用户主动开启。RAGPortal 服务端负责最终权限判断，SKILL 只负责保存配置并携带 Token。
 
 ### 18.2 MCP 配置
 
@@ -902,7 +902,7 @@ WorkBuddy 使用远程 Streamable HTTP MCP：
 }
 ```
 
-MCP 服务提供 `rag_list_documents`、`rag_search`、`rag_get_document`、`rag_download_file` 和 `rag_upload_document`。WorkBuddy 不接触 AI4MS 密码、WeKnora API Key、SQLite 或其他内部数据库。所有检索、读取、下载、写入和拒绝访问均应记录审计事件。
+MCP 服务提供 `rag_list_knowledge_bases`、`rag_list_documents`、`rag_search`、`rag_get_document`、`rag_download_file` 和 `rag_upload_document`。客户端应先调用 `rag_list_knowledge_bases` 查询 Token 绑定的知识库，再将返回的 `kb_id` 传给后续工具。未绑定的知识库不能被检索、读取、下载或写入。外部客户端不接触 AI4MS 密码、WeKnora API Key、SQLite 或其他内部数据库。所有检索、读取、下载、写入和拒绝访问均应记录审计事件。
 
 本需求的技术路线是:
 

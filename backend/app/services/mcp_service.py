@@ -10,10 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.weknora import get_knowledge, search_knowledge
+from app.services.kb_service import get_kb_list
 from app.models.upload import Upload
 from app.services.upload_service import handle_upload
 
 TOOL_PERMISSIONS = {
+    "rag_list_knowledge_bases": "knowledge-bases:list",
     "rag_list_documents": "documents:list",
     "rag_search": "documents:search",
     "rag_get_document": "documents:read",
@@ -23,9 +25,20 @@ TOOL_PERMISSIONS = {
 
 TOOL_DEFINITIONS = [
     {
-        "name": "rag_list_documents",
-        "description": "列出当前账户上传到 RAGPortal 的文档。",
+        "name": "rag_list_knowledge_bases",
+        "description": "列出当前 API Token 绑定的知识库。",
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "rag_list_documents",
+        "description": "列出当前账户在指定知识库的上传记录。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kb_id": {"type": "string", "description": "知识库 ID"},
+            },
+            "required": ["kb_id"],
+        },
     },
     {
         "name": "rag_search",
@@ -89,12 +102,22 @@ async def call_tool(
     user_id: str,
     tool_name: str,
     arguments: dict[str, Any],
+    allowed_knowledge_base_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """执行一个已完成权限校验的 MCP Tool。"""
+    allowed_ids = allowed_knowledge_base_ids or set()
+
+    if tool_name == "rag_list_knowledge_bases":
+        knowledge_bases = await get_kb_list()
+        return {"items": [kb for kb in knowledge_bases if kb.get("id") in allowed_ids]}
+
     if tool_name == "rag_list_documents":
+        kb_id = str(arguments.get("kb_id", "")).strip()
+        if kb_id not in allowed_ids:
+            raise ValueError("当前 Token 无权访问此知识库（未绑定）")
         result = await session.execute(
             select(Upload)
-            .where(Upload.uploader_user_id == user_id)
+            .where(Upload.uploader_user_id == user_id, Upload.kb_id == kb_id)
             .order_by(Upload.uploaded_at.desc())
             .limit(100)
         )
@@ -123,7 +146,7 @@ async def call_tool(
             )
         )
         upload = result.scalar_one_or_none()
-        if upload is None:
+        if upload is None or upload.kb_id not in allowed_ids:
             raise ValueError("文档不存在或无权访问")
         if tool_name == "rag_download_file":
             return {
@@ -149,14 +172,8 @@ async def call_tool(
         kb_id = str(arguments.get("kb_id", "")).strip()
         if not query or not kb_id:
             raise ValueError("query 和 kb_id 不能为空")
-        owned = await session.execute(
-            select(Upload.id).where(
-                Upload.uploader_user_id == user_id,
-                Upload.kb_id == kb_id,
-            ).limit(1)
-        )
-        if owned.scalar_one_or_none() is None:
-            raise ValueError("当前 Token 无权检索此知识库")
+        if kb_id not in allowed_ids:
+            raise ValueError("当前 Token 无权访问此知识库（未绑定）")
         return await search_knowledge(
             kb_id=kb_id,
             query=query,
@@ -172,6 +189,8 @@ async def call_tool(
             raise ValueError("content_base64 不是有效的 Base64") from exc
         if not kb_id or not content:
             raise ValueError("kb_id、filename 和 content_base64 不能为空")
+        if kb_id not in allowed_ids:
+            raise ValueError("当前 Token 无权访问此知识库（未绑定）")
         user = {
             "user_id": user_id,
             "username": user_id,

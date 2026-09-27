@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Copy, KeyRound, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { apiTokensApi, TOKEN_PERMISSIONS, type ApiToken } from '@/api/apiTokens'
+import { kbApi, type KbInfo } from '@/api/kb'
 
 export default function ApiTokensPage() {
   const [tokens, setTokens] = useState<ApiToken[]>([])
   const [name, setName] = useState('外部 MCP 客户端')
-  const [permissions, setPermissions] = useState<string[]>(['documents:list', 'documents:search', 'documents:read', 'documents:download'])
+  const [permissions, setPermissions] = useState<string[]>(['knowledge-bases:list', 'documents:list', 'documents:search', 'documents:read', 'documents:download'])
+  const [knowledgeBases, setKnowledgeBases] = useState<KbInfo[]>([])
+  const [knowledgeBaseIds, setKnowledgeBaseIds] = useState<string[]>([])
   const [secret, setSecret] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function load() {
     try {
-      setTokens((await apiTokensApi.list()).items)
+      const [tokenData, kbData] = await Promise.all([apiTokensApi.list(), kbApi.list()])
+      setTokens(tokenData.items)
+      setKnowledgeBases(kbData)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Token 列表加载失败')
     }
@@ -24,14 +29,19 @@ export default function ApiTokensPage() {
     setPermissions((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
   }
 
+  function toggleKnowledgeBase(id: string) {
+    setKnowledgeBaseIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  }
+
   async function createToken() {
     if (!name.trim()) return
     setLoading(true)
     setError('')
     try {
-      const result = await apiTokensApi.create(name, permissions)
+      const result = await apiTokensApi.create(name, permissions, knowledgeBaseIds)
       setSecret(result.secret)
       setName('外部 MCP 客户端')
+      setKnowledgeBaseIds([])
       await load()
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Token 创建失败')
@@ -78,14 +88,20 @@ export default function ApiTokensPage() {
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {TOKEN_PERMISSIONS.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm text-slate-700"><input type="checkbox" checked={permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} />{permission.label}<span className="ml-auto text-xs text-slate-400">{permission.key}</span></label>)}
         </div>
-        <button onClick={createToken} disabled={loading || !name.trim()} className="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Plus size={16} />{loading ? '创建中...' : '创建 Token'}</button>
+        <div className="mt-4 text-sm font-medium text-slate-700">绑定知识库</div>
+        <p className="mt-1 text-xs text-slate-500">外部客户端只能查询和操作勾选的知识库。</p>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {knowledgeBases.length === 0 && <div className="text-sm text-slate-400">暂无可绑定知识库</div>}
+          {knowledgeBases.map((kb) => <label key={kb.id} className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm text-slate-700"><input type="checkbox" checked={knowledgeBaseIds.includes(kb.id)} onChange={() => toggleKnowledgeBase(kb.id)} /><span className="truncate">{kb.name}</span><code className="ml-auto text-xs text-slate-400">{kb.id}</code></label>)}
+        </div>
+        <button onClick={createToken} disabled={loading || !name.trim() || knowledgeBaseIds.length === 0} className="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Plus size={16} />{loading ? '创建中...' : '创建 Token'}</button>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4 text-base font-semibold text-slate-900">已创建 Token</div>
         <div className="divide-y divide-slate-100">
           {tokens.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-400">暂无 Token</div>}
-          {tokens.map((token) => <div key={token.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="font-medium text-slate-800">{token.name} <code className="ml-2 text-xs text-slate-400">{token.token_prefix}...</code></div><div className="mt-1 text-xs text-slate-500">权限：{token.permissions.join('、')} · 创建于 {new Date(token.created_at).toLocaleString()}</div></div><button disabled={token.status !== 'active'} onClick={() => revokeToken(token)} className="inline-flex items-center gap-1 rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} />{token.status === 'active' ? '撤销' : '已撤销'}</button></div>)}
+          {tokens.map((token) => <div key={token.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="font-medium text-slate-800">{token.name} <code className="ml-2 text-xs text-slate-400">{token.token_prefix}...</code></div><div className="mt-1 text-xs text-slate-500">权限：{token.permissions.join('、')} · 知识库：{token.knowledge_base_ids.length} 个 · 创建于 {new Date(token.created_at).toLocaleString()}</div></div><button disabled={token.status !== 'active'} onClick={() => revokeToken(token)} className="inline-flex items-center gap-1 rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} />{token.status === 'active' ? '撤销' : '已撤销'}</button></div>)}
         </div>
       </section>
 

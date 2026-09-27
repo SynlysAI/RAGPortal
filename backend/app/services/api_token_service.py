@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.api_token import ApiToken
 
 ALL_PERMISSIONS = {
+    "knowledge-bases:list",
     "documents:list",
     "documents:search",
     "documents:read",
@@ -20,6 +21,7 @@ ALL_PERMISSIONS = {
     "documents:update",
 }
 READ_PERMISSIONS = {
+    "knowledge-bases:list",
     "documents:list",
     "documents:search",
     "documents:read",
@@ -57,6 +59,11 @@ def _normalize_permissions(permissions: set[str] | list[str]) -> set[str]:
     return {permission.strip() for permission in permissions if permission.strip()} & ALL_PERMISSIONS
 
 
+def _normalize_knowledge_base_ids(knowledge_base_ids: set[str] | list[str]) -> set[str]:
+    """清理 Token 绑定的知识库 ID。"""
+    return {kb_id.strip() for kb_id in knowledge_base_ids if kb_id.strip()}
+
+
 async def create_api_token(
     *,
     session: AsyncSession,
@@ -64,6 +71,7 @@ async def create_api_token(
     username: str,
     name: str,
     permissions: set[str] | list[str],
+    knowledge_base_ids: set[str] | list[str],
     expires_at: str = "",
 ) -> CreatedApiToken:
     """创建账户级 API Token。
@@ -80,6 +88,7 @@ async def create_api_token(
         包含一次性明文 secret 和数据库对象的结果。
     """
     normalized = _normalize_permissions(permissions)
+    normalized_kb_ids = _normalize_knowledge_base_ids(knowledge_base_ids)
     secret = f"rpt_{secrets.token_urlsafe(32)}"
     token = ApiToken(
         user_id=user_id,
@@ -88,6 +97,7 @@ async def create_api_token(
         token_prefix=secret[:12],
         token_hash=hash_token(secret),
         permissions_json=json.dumps(sorted(normalized), ensure_ascii=False),
+        knowledge_base_ids_json=json.dumps(sorted(normalized_kb_ids), ensure_ascii=False),
         created_at=_now(),
         expires_at=expires_at.strip(),
     )

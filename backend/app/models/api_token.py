@@ -18,6 +18,7 @@ class ApiToken(Base):
     token_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     permissions_json: Mapped[str] = mapped_column(Text, nullable=False)
+    knowledge_base_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     created_at: Mapped[str] = mapped_column(String(32), nullable=False)
     expires_at: Mapped[str] = mapped_column(String(32), default="", nullable=False)

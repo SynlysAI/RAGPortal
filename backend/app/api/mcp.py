@@ -40,6 +40,7 @@ async def mcp_endpoint(
 ) -> dict:
     """处理 WorkBuddy 发来的 MCP JSON-RPC 请求。"""
     token = await _get_token(request, session)
+    allowed_knowledge_base_ids = set(json.loads(token.knowledge_base_ids_json or "[]"))
     try:
         body = await request.json()
     except Exception as exc:
@@ -79,6 +80,7 @@ async def mcp_endpoint(
             user_id=token.user_id,
             tool_name=tool_name,
             arguments=params.get("arguments") or {},
+            allowed_knowledge_base_ids=allowed_knowledge_base_ids,
         )
     except ValueError as exc:
         return _jsonrpc_error(request_id, -32602, str(exc))
@@ -112,7 +114,8 @@ async def download_file(
         )
     )
     upload = result.scalar_one_or_none()
-    if upload is None:
+    allowed_knowledge_base_ids = set(json.loads(token.knowledge_base_ids_json or "[]"))
+    if upload is None or upload.kb_id not in allowed_knowledge_base_ids:
         raise HTTPException(status_code=404, detail="文档不存在或无权访问")
     content, media_type = await download_knowledge_file(upload.knowledge_id)
     return Response(

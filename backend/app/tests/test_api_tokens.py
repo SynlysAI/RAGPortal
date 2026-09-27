@@ -28,10 +28,12 @@ def test_create_token_returns_secret_once_and_verifies_permissions():
                 username="alice",
                 name="WorkBuddy",
                 permissions={"documents:search", "documents:read"},
+                knowledge_base_ids={"kb-a", "kb-b"},
             )
             assert result.secret.startswith("rpt_")
             assert result.token.token_hash != result.secret
             assert result.token.permissions_json
+            assert result.token.knowledge_base_ids_json
             assert await verify_api_token(session, result.secret, "documents:search")
             assert not await verify_api_token(session, result.secret, "documents:write")
         await engine.dispose()
@@ -53,6 +55,7 @@ def test_revoked_token_is_invalid():
                 username="alice",
                 name="临时 Token",
                 permissions=ALL_PERMISSIONS,
+                knowledge_base_ids={"kb-a"},
             )
             await revoke_api_token(session, result.token.id, "u1")
             assert await verify_api_token(session, result.secret) is None

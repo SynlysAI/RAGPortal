@@ -100,6 +100,22 @@ def _migrate_kb_requests_table(sync_conn) -> None:
     )
 
 
+def _migrate_api_tokens_table(sync_conn) -> None:
+    """补齐 API Token 的知识库绑定列。"""
+    inspector = inspect(sync_conn)
+    try:
+        columns = {column["name"] for column in inspector.get_columns("api_tokens")}
+    except Exception:
+        columns = set()
+    _add_column_if_missing(
+        sync_conn,
+        columns,
+        "api_tokens",
+        "knowledge_base_ids_json",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )
+
+
 def _add_column_if_missing(sync_conn, columns, table: str, name: str, ddl: str) -> None:
     """若表的某列不存在则 ALTER TABLE 补齐。
 
@@ -121,6 +137,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_migrate_uploads_table)
         await conn.run_sync(_migrate_kb_requests_table)
+        await conn.run_sync(_migrate_api_tokens_table)
 
 
 async def get_session() -> AsyncSession:
