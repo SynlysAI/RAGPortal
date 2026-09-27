@@ -34,6 +34,9 @@ async def handle_upload(
     workspace_slug: str = "",
     research_project_id: str = "",
     chain_node_id: str = "",
+    org_unit_id: str = "",
+    org_unit_name: str = "",
+    chain_id: str = "",
     file_sha256: str = "",
     max_size_bytes: int,
     allowed_types: set[str],
@@ -43,9 +46,14 @@ async def handle_upload(
     Raises:
         UploadError: 业务校验失败(权限/大小/类型/重复/上游错误)。
     """
-    if not await is_kb_allowed(kb_id):
-        raise UploadError(403, "无权上传到此知识库")
-    kb = await find_kb(kb_id)
+    try:
+        if not await is_kb_allowed(kb_id):
+            raise UploadError(403, "无权上传到此知识库")
+        kb = await find_kb(kb_id)
+    except WeknoraError as exc:
+        if exc.status == 401:
+            raise UploadError(401, "WeKnora 认证失败，请检查 API Key") from exc
+        raise UploadError(exc.status, exc.message) from exc
 
     file_bytes = await file.read()
     if len(file_bytes) > max_size_bytes:
@@ -69,6 +77,14 @@ async def handle_upload(
             uploader_username=uploader_username,
             uploader_organization=uploader_organization,
             custom_filename=file.filename or "",
+            research_metadata={
+                "workspace_slug": workspace_slug,
+                "research_project_id": research_project_id,
+                "chain_node_id": chain_node_id,
+                "org_unit_id": org_unit_id,
+                "org_unit_name": org_unit_name,
+                "chain_id": chain_id,
+            },
         )
     except WeknoraError as e:
         if e.status == 409:
@@ -91,6 +107,9 @@ async def handle_upload(
         workspace_slug=workspace_slug,
         research_project_id=research_project_id,
         chain_node_id=chain_node_id,
+        org_unit_id=org_unit_id,
+        org_unit_name=org_unit_name,
+        chain_id=chain_id,
         file_name=file.filename or "untitled",
         file_type=ext,
         file_size=len(file_bytes),

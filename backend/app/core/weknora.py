@@ -228,6 +228,7 @@ async def upload_file(
     uploader_username: str,
     uploader_organization: str = "",
     custom_filename: str = "",
+    research_metadata: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """代理 WeKnora 单文件上传。
 
@@ -240,6 +241,7 @@ async def upload_file(
         uploader_username: 上传者用户名(冗余快照)。
         uploader_organization: 上传者组织(冗余快照)。
         custom_filename: 自定义文件名(文件夹场景含相对路径)。
+        research_metadata: 小组与课题追溯字段，只在完整提供时写入。
 
     Returns:
         WeKnora 返回的 knowledge 对象。
@@ -252,6 +254,7 @@ async def upload_file(
         "uploader_name": uploader_username,
         "uploader_org": uploader_organization,
     }
+    metadata.update({key: value for key, value in (research_metadata or {}).items() if value})
     data: dict[str, Any] = {"metadata": _json.dumps(metadata)}
     if custom_filename:
         data["fileName"] = custom_filename
@@ -269,4 +272,6 @@ async def upload_file(
             _safe_json(resp).get("detail", "上传失败"),
             _safe_json(resp),
         )
-    return _extract_response_data(_safe_json(resp))
+    receipt = _extract_response_data(_safe_json(resp))
+    receipt.setdefault("task_id", receipt.get("id", ""))
+    return receipt

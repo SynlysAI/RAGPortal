@@ -30,6 +30,9 @@ def _to_dict(u: Upload) -> dict:
         "workspace_slug": u.workspace_slug,
         "research_project_id": u.research_project_id,
         "chain_node_id": u.chain_node_id,
+        "org_unit_id": u.org_unit_id,
+        "org_unit_name": u.org_unit_name,
+        "chain_id": u.chain_id,
         "file_name": u.file_name,
         "file_type": u.file_type,
         "file_size": u.file_size,
@@ -86,6 +89,9 @@ async def upload(
     workspace_slug: Optional[str] = Form(None),
     research_project_id: Optional[str] = Form(None),
     chain_node_id: Optional[str] = Form(None),
+    org_unit_id: Optional[str] = Form(None),
+    org_unit_name: Optional[str] = Form(None),
+    chain_id: Optional[str] = Form(None),
     file_sha256: Optional[str] = Form(None),
     user: UserInfo = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -102,6 +108,11 @@ async def upload(
         research_project_id=research_project_id,
         chain_node_id=chain_node_id,
     )
+    group_metadata = _validate_group_metadata(
+        org_unit_id=org_unit_id,
+        org_unit_name=org_unit_name,
+        chain_id=chain_id,
+    )
     try:
         record = await handle_upload(
             session=session,
@@ -113,6 +124,9 @@ async def upload(
             workspace_slug=research_metadata["workspace_slug"],
             research_project_id=research_metadata["research_project_id"],
             chain_node_id=research_metadata["chain_node_id"],
+            org_unit_id=group_metadata["org_unit_id"],
+            org_unit_name=group_metadata["org_unit_name"],
+            chain_id=group_metadata["chain_id"],
             file_sha256=(file_sha256 or "").strip(),
             max_size_bytes=settings.upload_max_size_mb * 1024 * 1024,
             allowed_types=settings.allowed_file_types_set,
@@ -155,6 +169,41 @@ def _validate_research_metadata(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="research IDs must be UUIDs") from exc
     return {"workspace_slug": workspace, "research_project_id": project_id, "chain_node_id": node_id}
+
+
+def _validate_group_metadata(
+    *,
+    org_unit_id: Optional[str],
+    org_unit_name: Optional[str],
+    chain_id: Optional[str],
+) -> dict[str, str]:
+    """校验小组知识库追溯字段；全部缺省时兼容旧客户端。
+
+    Args:
+        org_unit_id: 小组组织节点 ID。
+        org_unit_name: 小组名称。
+        chain_id: 研究链 ID。
+
+    Returns:
+        规范化后的小组 metadata。
+
+    Raises:
+        HTTPException: 任一项存在但三项不完整，或格式不合法。
+    """
+    values = (org_unit_id or "").strip(), (org_unit_name or "").strip(), (chain_id or "").strip()
+    if not any(values):
+        return {"org_unit_id": "", "org_unit_name": "", "chain_id": ""}
+    unit_id, unit_name, chain = values
+    if not all(values):
+        raise HTTPException(status_code=422, detail="group metadata must contain org_unit_id, org_unit_name and chain_id")
+    if not 1 <= len(unit_name) <= 255:
+        raise HTTPException(status_code=422, detail="org_unit_name is invalid")
+    try:
+        UUID(unit_id)
+        UUID(chain)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="group IDs must be UUIDs") from exc
+    return {"org_unit_id": unit_id, "org_unit_name": unit_name, "chain_id": chain}
 
 
 @router.get("/mine")

@@ -22,6 +22,9 @@ class Upload(Base):
     workspace_slug: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     research_project_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     chain_node_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    org_unit_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    org_unit_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    chain_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     file_name: Mapped[str] = mapped_column(String(512), nullable=False)
     file_type: Mapped[str] = mapped_column(String(16), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -37,6 +40,7 @@ class Upload(Base):
         Index("idx_uploads_kb_time", "kb_id", "uploaded_at"),
         Index("idx_uploads_kb_hash", "kb_id", "file_hash"),
         Index("idx_uploads_research_project", "workspace_slug", "research_project_id", "chain_node_id"),
+        Index("idx_uploads_org_unit", "org_unit_id", "chain_id"),
         Index("idx_uploads_status", "parse_status"),
         Index("idx_uploads_time", "uploaded_at"),
     )
