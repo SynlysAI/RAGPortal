@@ -61,6 +61,17 @@ TOOL_DEFINITIONS = [
             },
             "required": ["query"],
         },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "items": {"type": "array", "items": {"type": "object"}},
+                "kb_ids": {"type": "array", "items": {"type": "string"}},
+                "partial": {"type": "boolean"},
+                "errors": {"type": "array", "items": {"type": "object"}},
+                "ranking": {"type": "string"},
+            },
+            "required": ["items", "kb_ids", "partial", "errors", "ranking"],
+        },
     },
     {
         "name": "rag_get_document",

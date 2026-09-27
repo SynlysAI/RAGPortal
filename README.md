@@ -48,7 +48,7 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 
 部署到外部 Agent 使用时必须设置 `MCP_PUBLIC_BASE_URL=https://你的 RAGPortal 公网域名`；本地开发才允许回退到 `FRONTEND_ORIGIN`。不能把 `localhost` 或 `127.0.0.1` 作为外部客户端图片地址。
 
-`rag_search` 的文本结果会精简为文档标题、知识库、文档 ID 和短片段；结构化结果不包含 WeKnora 内部 `metadata`、重复的 `matched_content` 或冗长图片 OCR。图片说明和 Markdown 链接单独返回，避免客户端在显示图片前截断大段原始 JSON。
+`rag_search` 的第一个文本结果块会返回清理后的结构化 JSON，兼容只读取 MCP `content` 的外部 Agent；同时保留 `structuredContent` 供支持结构化输出的客户端解析。结果不包含 WeKnora 内部 `metadata`、重复的 `matched_content` 或冗长图片 OCR。图片说明和 Markdown 链接单独作为文本块返回，`resource://` 内部引用不会暴露给外部客户端。
 
 ### 短期文件下载
 

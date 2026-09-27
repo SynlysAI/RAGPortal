@@ -19,6 +19,15 @@ def test_tool_definitions_only_include_granted_permissions():
     assert [tool["name"] for tool in tools] == ["rag_search"]
 
 
+def test_search_tool_declares_output_schema():
+    """检索 Tool 声明结构化输出，便于客户端解析 structuredContent。"""
+    tool = get_tool_definitions({"documents:search"})[0]
+    assert tool["outputSchema"]["type"] == "object"
+    assert set(tool["outputSchema"]["required"]) == {
+        "items", "kb_ids", "partial", "errors", "ranking",
+    }
+
+
 def test_knowledge_base_tool_requires_list_permission():
     """知识库列表 Tool 受独立权限控制。"""
     assert get_tool_definitions({"knowledge-bases:list"})[0]["name"] == "rag_list_knowledge_bases"

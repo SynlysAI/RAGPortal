@@ -19,7 +19,6 @@ from app.services.api_token_service import verify_api_token
 from app.services.download_ticket_service import resolve_download_ticket
 from app.services.mcp_service import TOOL_PERMISSIONS, call_tool, get_tool_definitions
 from app.services.mcp_images import search_image_markdown_blocks
-from app.services.mcp_search_service import format_search_text
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -94,16 +93,19 @@ async def mcp_endpoint(
         return _jsonrpc_error(request_id, -32602, str(exc))
     except Exception as exc:
         return _jsonrpc_error(request_id, -32000, f"Tool 执行失败: {exc}")
-    content = [{
-        "type": "text",
-        "text": (
-            format_search_text(result)
-            if tool_name == "rag_search"
-            else json.dumps(result, ensure_ascii=False)
-        ),
-    }]
     if tool_name == "rag_search":
-        content.extend(await search_image_markdown_blocks(result, session, token.id))
+        # 先生成公开图片链接，再序列化结果，避免泄露 resource:// 内部引用。
+        image_blocks = await search_image_markdown_blocks(result, session, token.id)
+        content = [{
+            "type": "text",
+            "text": json.dumps(result, ensure_ascii=False),
+        }]
+        content.extend(image_blocks)
+    else:
+        content = [{
+            "type": "text",
+            "text": json.dumps(result, ensure_ascii=False),
+        }]
     return {
         "jsonrpc": "2.0",
         "id": request_id,
