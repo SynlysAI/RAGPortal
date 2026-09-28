@@ -6,7 +6,8 @@ export const TOKEN_PERMISSIONS = [
   { key: 'documents:search', label: '文档检索' },
   { key: 'documents:read', label: '文档读取' },
   { key: 'documents:download', label: '文件下载' },
-  { key: 'documents:write', label: '文档写入' },
+  { key: 'documents:status', label: '上传状态查询' },
+  { key: 'documents:write', label: '文档上传' },
   { key: 'documents:update', label: '文档更新' },
 ] as const
 

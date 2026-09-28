@@ -55,7 +55,7 @@ Skill 文件提供调用指导，MCP 服务地址和 Token 仍需配置在客户
 | `rag_get_document` | `documents:read` | `document_id` 必填 | `document_id`、`kb_id`、`source`；`source` 为 WeKnora 文档详情，字段随上游返回变化。 |
 | `rag_download_file` | `documents:download` | `document_id` 必填 | `document_id`、`filename`、`download_url`、`expires_at`。 |
 | `rag_upload_document` | `documents:write` | `kb_id`、`filename`、`content_base64` 必填 | `document_id`、`knowledge_id`、`upload_id`、`filename`。 |
-| `rag_get_upload_status` | `documents:write` | 上传结果中的 `document_id` 必填 | `document_id`、`upload_id`、`kb_id`、`filename`、`parse_status`、`enable_status`、`error_message`、`checked_at`。仅限本人上传且 Token 仍绑定的知识库。 |
+| `rag_get_upload_status` | `documents:status` | 上传结果中的 `document_id` 必填 | `document_id`、`upload_id`、`kb_id`、`filename`、`parse_status`、`enable_status`、`error_message`、`checked_at`。仅限本人上传且 Token 仍绑定的知识库。 |
 
 `document_id` 是 WeKnora 文档 ID，可从检索、文档列表或上传结果取得。`upload_id` 只是 RAGPortal 本地上传记录 ID，不能传给读取或下载工具。只可访问 Token 已绑定的知识库；工具列表也会按 Token 权限过滤。
 

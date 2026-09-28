@@ -17,6 +17,7 @@ ALL_PERMISSIONS = {
     "documents:search",
     "documents:read",
     "documents:download",
+    "documents:status",
     "documents:write",
     "documents:update",
 }
@@ -26,6 +27,7 @@ READ_PERMISSIONS = {
     "documents:search",
     "documents:read",
     "documents:download",
+    "documents:status",
 }
 
 

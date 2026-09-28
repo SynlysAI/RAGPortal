@@ -61,7 +61,7 @@ async def mcp_endpoint(
             "result": {
                 "protocolVersion": "2025-03-26",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "RAGPortal", "version": "0.3.0"},
+                "serverInfo": {"name": "RAGPortal", "version": "0.3.1"},
             },
         }
     if method == "tools/list":

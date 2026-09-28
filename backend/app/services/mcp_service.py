@@ -28,7 +28,7 @@ TOOL_PERMISSIONS = {
     "rag_get_document": "documents:read",
     "rag_download_file": "documents:download",
     "rag_upload_document": "documents:write",
-    "rag_get_upload_status": "documents:write",
+    "rag_get_upload_status": "documents:status",
 }
 
 TOOL_DEFINITIONS = [

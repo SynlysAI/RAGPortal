@@ -205,10 +205,14 @@ def test_upload_returns_weknora_document_id_and_separate_upload_id(monkeypatch):
     }
 
 
-def test_upload_status_tool_is_available_with_write_permission():
-    """仅有写权限的 Token 也能查询自己上传文档的处理状态。"""
-    names = [tool["name"] for tool in get_tool_definitions({"documents:write"})]
-    assert names == ["rag_upload_document", "rag_get_upload_status"]
+def test_upload_status_tool_has_independent_permission():
+    """上传状态查询使用独立权限，不会随文档写入权限隐式开放。"""
+    assert [tool["name"] for tool in get_tool_definitions({"documents:status"})] == [
+        "rag_get_upload_status",
+    ]
+    assert [tool["name"] for tool in get_tool_definitions({"documents:write"})] == [
+        "rag_upload_document",
+    ]
 
 
 def test_upload_status_reads_current_weknora_state(monkeypatch):

@@ -26,7 +26,7 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 }
 ```
 
-外部 MCP 客户端只访问 RAGPortal，不能直接访问 WeKnora、数据库或 AI4MS 密码。创建 Token 时必须绑定知识库，并勾选文档列表、检索、读取、下载和写入等权限。
+外部 MCP 客户端只访问 RAGPortal，不能直接访问 WeKnora、数据库或 AI4MS 密码。创建 Token 时必须绑定知识库，并按需勾选文档列表、检索、读取、下载、上传状态查询和写入等权限；上传状态查询使用独立的 `documents:status` 权限，不会授予文档写入能力。
 
 `rag_search` 不传 `kb_id` 或 `kb_ids` 时检索 Token 绑定的全部知识库。需要限定范围时，可以先调用 `rag_list_knowledge_bases` 获取 ID，再传 `kb_id`（单库）或 `kb_ids`（多库）；两种范围参数不能同时提供。未绑定的库不能被检索。
 
@@ -44,7 +44,7 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 
 所有 MCP 文档工具统一使用 WeKnora 文档 ID（字符串）作为 `document_id`。`rag_search` 的每条命中和 `rag_upload_document` 的返回值都提供该字段；上传结果另用 `upload_id` 表示 RAGPortal 本地记录 ID，并保留 `knowledge_id` 兼容原有调用。
 
-上传后可用 `rag_get_upload_status` 和返回的 `document_id` 查询 WeKnora 的实时处理状态。此工具需要 `documents:write` 权限，只能查询 Token 所属用户上传、且仍在 Token 绑定知识库中的文档；返回 `parse_status`、`enable_status`、`error_message` 和 `checked_at`。`parse_status` 保留 WeKnora 的 `pending`、`processing`、`finalizing`、`completed`、`failed`、`cancelled` 原值；上游文档已不存在时返回 `deleted`。只有 `completed` 表示解析与后续处理结束，上传接口返回成功并不代表处理完成。
+上传后可用 `rag_get_upload_status` 和返回的 `document_id` 查询 WeKnora 的实时处理状态。此工具需要独立的 `documents:status` 权限，只能查询 Token 所属用户上传、且仍在 Token 绑定知识库中的文档；返回 `parse_status`、`enable_status`、`error_message` 和 `checked_at`。`parse_status` 保留 WeKnora 的 `pending`、`processing`、`finalizing`、`completed`、`failed`、`cancelled` 原值；上游文档已不存在时返回 `deleted`。只有 `completed` 表示解析与后续处理结束，上传接口返回成功并不代表处理完成。
 
 检索命中包含 WeKnora `image_info` 时，RAGPortal 会将图片说明和短期链接写入该字段的 `caption` 和 `markdown_url`。链接由后端在已授权知识库内代理读取，默认有效 30 天，最多返回 3 张，只接受 JPEG、PNG、WebP 和 GIF。`resource://` 引用不会暴露给外部客户端，非多模态模型也可以根据这些字段生成带图片的 Markdown 回复。
 
