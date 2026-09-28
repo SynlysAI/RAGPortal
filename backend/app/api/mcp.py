@@ -61,7 +61,7 @@ async def mcp_endpoint(
             "result": {
                 "protocolVersion": "2025-03-26",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "RAGPortal", "version": "0.2.0"},
+                "serverInfo": {"name": "RAGPortal", "version": "0.3.0"},
             },
         }
     if method == "tools/list":
@@ -94,18 +94,12 @@ async def mcp_endpoint(
     except Exception as exc:
         return _jsonrpc_error(request_id, -32000, f"Tool 执行失败: {exc}")
     if tool_name == "rag_search":
-        # 先生成公开图片链接，再序列化结果，避免泄露 resource:// 内部引用。
-        image_blocks = await search_image_markdown_blocks(result, session, token.id)
-        content = [{
-            "type": "text",
-            "text": json.dumps(result, ensure_ascii=False),
-        }]
-        content.extend(image_blocks)
-    else:
-        content = [{
-            "type": "text",
-            "text": json.dumps(result, ensure_ascii=False),
-        }]
+        # 图片短链写入 image_info，仅返回 JSON，不追加重复的 Markdown 文本块。
+        await search_image_markdown_blocks(result, session, token.id)
+    content = [{
+        "type": "text",
+        "text": json.dumps(result, ensure_ascii=False),
+    }]
     return {
         "jsonrpc": "2.0",
         "id": request_id,

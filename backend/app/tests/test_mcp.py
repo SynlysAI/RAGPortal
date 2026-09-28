@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.models.upload import Base
+from app.core.weknora import WeknoraError
+from app.models.upload import Base, Upload
 from app.services.mcp_service import call_tool, get_tool_definitions
 from app.services import mcp_service
 
@@ -202,6 +203,150 @@ def test_upload_returns_weknora_document_id_and_separate_upload_id(monkeypatch):
         "upload_id": 42,
         "filename": "论文.pdf",
     }
+
+
+def test_upload_status_tool_is_available_with_write_permission():
+    """仅有写权限的 Token 也能查询自己上传文档的处理状态。"""
+    names = [tool["name"] for tool in get_tool_definitions({"documents:write"})]
+    assert names == ["rag_upload_document", "rag_get_upload_status"]
+
+
+def test_upload_status_reads_current_weknora_state(monkeypatch):
+    """查询本人上传记录时返回 WeKnora 的实时解析和启用状态。
+
+    Args:
+        monkeypatch: 替换 WeKnora 详情请求。
+    """
+    async def run():
+        """在临时数据库中执行状态查询。"""
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            session.add(Upload(
+                knowledge_id="wk-1", kb_id="bound", kb_name="授权库",
+                uploader_user_id="u1", uploader_username="用户",
+                file_name="论文.pdf", file_type="pdf", file_size=3,
+                uploaded_at="2026-09-28T00:00:00+00:00",
+            ))
+            await session.commit()
+            detail_mock = AsyncMock(return_value={
+                "id": "wk-1", "knowledge_base_id": "bound",
+                "parse_status": "finalizing", "enable_status": "disabled",
+                "error_message": "",
+            })
+            monkeypatch.setattr(mcp_service, "get_knowledge", detail_mock)
+            result = await call_tool(
+                session=session, user_id="u1", tool_name="rag_get_upload_status",
+                arguments={"document_id": "wk-1"},
+                allowed_knowledge_base_ids={"bound"},
+            )
+            assert result["document_id"] == "wk-1"
+            assert result["upload_id"] == 1
+            assert result["parse_status"] == "finalizing"
+            assert result["enable_status"] == "disabled"
+            assert result["error_message"] == ""
+            assert result["checked_at"]
+            detail_mock.assert_awaited_once_with("wk-1")
+            detail_mock.return_value = {
+                "id": "wk-1", "knowledge_base_id": "bound",
+                "parse_status": "cancelled", "enable_status": "disabled",
+                "error_message": "用户已取消解析",
+            }
+            cancelled = await call_tool(
+                session=session, user_id="u1", tool_name="rag_get_upload_status",
+                arguments={"document_id": "wk-1"},
+                allowed_knowledge_base_ids={"bound"},
+            )
+            assert cancelled["parse_status"] == "cancelled"
+            assert cancelled["error_message"] == "用户已取消解析"
+            detail_mock.side_effect = WeknoraError(404, "文档不存在")
+            deleted = await call_tool(
+                session=session, user_id="u1", tool_name="rag_get_upload_status",
+                arguments={"document_id": "wk-1"},
+                allowed_knowledge_base_ids={"bound"},
+            )
+            assert deleted["parse_status"] == "deleted"
+        await engine.dispose()
+
+    asyncio.run(run())
+
+
+def test_upload_status_rejects_other_users_before_upstream_call(monkeypatch):
+    """即使文档在绑定库中，也不能查询其他用户的上传状态。
+
+    Args:
+        monkeypatch: 监测是否访问 WeKnora。
+    """
+    async def run():
+        """在临时数据库中验证上传者隔离。"""
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            session.add(Upload(
+                knowledge_id="wk-1", kb_id="bound", kb_name="授权库",
+                uploader_user_id="u2", uploader_username="其他用户",
+                file_name="论文.pdf", file_type="pdf", file_size=3,
+                uploaded_at="2026-09-28T00:00:00+00:00",
+            ))
+            await session.commit()
+            detail_mock = AsyncMock()
+            monkeypatch.setattr(mcp_service, "get_knowledge", detail_mock)
+            try:
+                await call_tool(
+                    session=session, user_id="u1", tool_name="rag_get_upload_status",
+                    arguments={"document_id": "wk-1"},
+                    allowed_knowledge_base_ids={"bound"},
+                )
+            except ValueError as exc:
+                assert "无权" in str(exc)
+            else:
+                raise AssertionError("应拒绝查询其他用户的上传记录")
+            detail_mock.assert_not_awaited()
+        await engine.dispose()
+
+    asyncio.run(run())
+
+
+def test_upload_status_rejects_unbound_knowledge_base(monkeypatch):
+    """Token 解绑知识库后不能继续查询该库中的上传状态。
+
+    Args:
+        monkeypatch: 监测是否访问 WeKnora。
+    """
+    async def run():
+        """在临时数据库中验证知识库绑定。"""
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            session.add(Upload(
+                knowledge_id="wk-1", kb_id="other", kb_name="未授权库",
+                uploader_user_id="u1", uploader_username="用户",
+                file_name="论文.pdf", file_type="pdf", file_size=3,
+                uploaded_at="2026-09-28T00:00:00+00:00",
+            ))
+            await session.commit()
+            detail_mock = AsyncMock()
+            monkeypatch.setattr(mcp_service, "get_knowledge", detail_mock)
+            try:
+                await call_tool(
+                    session=session, user_id="u1", tool_name="rag_get_upload_status",
+                    arguments={"document_id": "wk-1"},
+                    allowed_knowledge_base_ids={"bound"},
+                )
+            except ValueError as exc:
+                assert "无权" in str(exc)
+            else:
+                raise AssertionError("应拒绝查询未绑定知识库的上传状态")
+            detail_mock.assert_not_awaited()
+        await engine.dispose()
+
+    asyncio.run(run())
 
 
 def test_download_tool_returns_short_lived_public_link(monkeypatch):

@@ -44,11 +44,13 @@ AI⁴MS 子应用 — 独立的知识库文档上传门户。
 
 所有 MCP 文档工具统一使用 WeKnora 文档 ID（字符串）作为 `document_id`。`rag_search` 的每条命中和 `rag_upload_document` 的返回值都提供该字段；上传结果另用 `upload_id` 表示 RAGPortal 本地记录 ID，并保留 `knowledge_id` 兼容原有调用。
 
-检索命中包含 WeKnora `image_info` 时，RAGPortal 会在文本结果中附带 Markdown 图片链接。链接由后端在已授权知识库内代理读取，默认有效 30 天，最多返回 3 张，只接受 JPEG、PNG、WebP 和 GIF。`resource://` 引用不会暴露给外部客户端，非多模态模型也可以直接生成带图片的 Markdown 回复。
+上传后可用 `rag_get_upload_status` 和返回的 `document_id` 查询 WeKnora 的实时处理状态。此工具需要 `documents:write` 权限，只能查询 Token 所属用户上传、且仍在 Token 绑定知识库中的文档；返回 `parse_status`、`enable_status`、`error_message` 和 `checked_at`。`parse_status` 保留 WeKnora 的 `pending`、`processing`、`finalizing`、`completed`、`failed`、`cancelled` 原值；上游文档已不存在时返回 `deleted`。只有 `completed` 表示解析与后续处理结束，上传接口返回成功并不代表处理完成。
+
+检索命中包含 WeKnora `image_info` 时，RAGPortal 会将图片说明和短期链接写入该字段的 `caption` 和 `markdown_url`。链接由后端在已授权知识库内代理读取，默认有效 30 天，最多返回 3 张，只接受 JPEG、PNG、WebP 和 GIF。`resource://` 引用不会暴露给外部客户端，非多模态模型也可以根据这些字段生成带图片的 Markdown 回复。
 
 部署到外部 Agent 使用时必须设置 `MCP_PUBLIC_BASE_URL=https://你的 RAGPortal 公网域名`；本地开发才允许回退到 `FRONTEND_ORIGIN`。不能把 `localhost` 或 `127.0.0.1` 作为外部客户端图片地址。
 
-`rag_search` 的第一个文本结果块会返回清理后的结构化 JSON，兼容只读取 MCP `content` 的外部 Agent；同时保留 `structuredContent` 供支持结构化输出的客户端解析。结果不包含 WeKnora 内部 `metadata`、重复的 `matched_content` 或冗长图片 OCR。图片说明和 Markdown 链接单独作为文本块返回，`resource://` 内部引用不会暴露给外部客户端。
+`rag_search` 的 `content` 仅包含一个文本结果块，返回清理后的结构化 JSON，兼容只读取 MCP `content` 的外部 Agent；同时保留 `structuredContent` 供支持结构化输出的客户端解析。结果不包含 WeKnora 内部 `metadata`、重复的 `matched_content` 或冗长图片 OCR。图片说明和链接保留在 JSON 的 `image_info` 中，不再额外追加图片 Markdown 文本块。
 
 ### 短期文件下载
 

@@ -2,22 +2,24 @@
 
 import base64
 import io
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-
 from fastapi import UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.weknora import (
     WeknoraError, get_knowledge, list_knowledge_page, search_knowledge,
 )
-from app.services.kb_service import get_kb_list
-from app.services.upload_service import handle_upload
-from app.services.mcp_search_service import resolve_search_scope, search_libraries
+from app.models.upload import Upload
 from app.services.download_ticket_service import create_download_ticket
+from app.services.kb_service import get_kb_list
+from app.services.mcp_search_service import resolve_search_scope, search_libraries
+from app.services.upload_service import handle_upload
 
 TOOL_PERMISSIONS = {
     "rag_list_knowledge_bases": "knowledge-bases:list",
@@ -26,6 +28,7 @@ TOOL_PERMISSIONS = {
     "rag_get_document": "documents:read",
     "rag_download_file": "documents:download",
     "rag_upload_document": "documents:write",
+    "rag_get_upload_status": "documents:write",
 }
 
 TOOL_DEFINITIONS = [
@@ -102,6 +105,17 @@ TOOL_DEFINITIONS = [
                 "content_base64": {"type": "string"},
             },
             "required": ["kb_id", "filename", "content_base64"],
+        },
+    },
+    {
+        "name": "rag_get_upload_status",
+        "description": "查询当前用户通过 RAGPortal 上传的文档在 WeKnora 中的实时解析状态。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "document_id": {"type": "string", "description": "上传结果中的文档 ID"},
+            },
+            "required": ["document_id"],
         },
     },
 ]
@@ -243,6 +257,44 @@ async def call_tool(
             query=query.strip(), kb_ids=kb_ids, top_k=top_k,
             names=names, search_one=search_knowledge,
         )
+
+    if tool_name == "rag_get_upload_status":
+        document_id = arguments.get("document_id")
+        if not isinstance(document_id, str) or not document_id.strip():
+            raise ValueError("document_id 必须是 WeKnora 文档 ID")
+        document_id = document_id.strip()
+        stmt = select(Upload).where(
+            Upload.knowledge_id == document_id,
+            Upload.uploader_user_id == user_id,
+            Upload.kb_id.in_(allowed_ids),
+        )
+        upload = (await session.execute(stmt)).scalar_one_or_none()
+        if upload is None:
+            raise ValueError("上传记录不存在或无权访问")
+        try:
+            knowledge = await get_knowledge(document_id)
+        except WeknoraError as exc:
+            if exc.status != 404:
+                raise
+            parse_status = "deleted"
+            enable_status = ""
+            error_message = "上游文档已删除"
+        else:
+            if knowledge.get("knowledge_base_id") != upload.kb_id:
+                raise ValueError("文档不存在或无权访问")
+            parse_status = str(knowledge.get("parse_status") or "unknown").lower()
+            enable_status = str(knowledge.get("enable_status") or "").lower()
+            error_message = str(knowledge.get("error_message") or "")
+        return {
+            "document_id": document_id,
+            "upload_id": upload.id,
+            "kb_id": upload.kb_id,
+            "filename": upload.file_name,
+            "parse_status": parse_status,
+            "enable_status": enable_status,
+            "error_message": error_message,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     if tool_name == "rag_upload_document":
         filename = str(arguments.get("filename", "untitled")).strip() or "untitled"
