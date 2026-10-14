@@ -26,8 +26,12 @@ def test_search_tool_declares_output_schema():
     tool = get_tool_definitions({"documents:search"})[0]
     assert tool["outputSchema"]["type"] == "object"
     assert set(tool["outputSchema"]["required"]) == {
-        "items", "kb_ids", "partial", "errors", "ranking",
+        "items", "kb_ids", "partial", "errors",
     }
+    item_schema = tool["outputSchema"]["properties"]["items"]["items"]
+    assert set(item_schema["required"]) == {"document_id", "kb_id", "content"}
+    image_schema = item_schema["properties"]["image_info"]["items"]
+    assert set(image_schema["required"]) == {"url", "caption"}
 
 
 def test_knowledge_base_tool_requires_list_permission():
@@ -413,7 +417,7 @@ def test_search_defaults_to_all_bound_libraries(monkeypatch):
     async def search_library(**kwargs):
         """模拟各知识库的有序命中结果。"""
         kb_id = kwargs["kb_id"]
-        return {"items": [{"id": f"{kb_id}-1"}, {"id": f"{kb_id}-2"}]}
+        return {"items": [{"knowledge_id": f"{kb_id}-1"}, {"knowledge_id": f"{kb_id}-2"}]}
 
     monkeypatch.setattr(mcp_service, "search_knowledge", search_library)
     monkeypatch.setattr(mcp_service, "get_kb_list", AsyncMock(return_value=[
@@ -425,15 +429,23 @@ def test_search_defaults_to_all_bound_libraries(monkeypatch):
         allowed_knowledge_base_ids={"b", "a"},
     ))
     assert result["kb_ids"] == ["a", "b"]
-    assert [item["id"] for item in result["items"]] == ["a-1", "b-1", "a-2"]
+    assert [item["document_id"] for item in result["items"]] == ["a-1", "b-1", "a-2"]
     assert result["items"][0]["kb_name"] == "文献库"
     assert result["items"][1]["kb_id"] == "b"
 
 
 def test_search_hit_exposes_weknora_document_id(monkeypatch):
-    """检索命中可直接传给文档读取工具。"""
+    """检索命中可直接传给文档读取工具，且不再输出冗余同值字段。"""
     monkeypatch.setattr(mcp_service, "search_knowledge", AsyncMock(return_value={
-        "items": [{"knowledge_id": "wk-1", "content": "实验记录"}],
+        "items": [{
+            "id": "chunk-1",
+            "knowledge_id": "wk-1",
+            "content": "实验记录",
+            "knowledge_title": "论文A",
+            "knowledge_filename": "论文A",
+            "score": 0.5,
+            "chunk_index": 3,
+        }],
     }))
     monkeypatch.setattr(mcp_service, "get_kb_list", AsyncMock(return_value=[]))
     result = asyncio.run(call_tool(
@@ -441,8 +453,10 @@ def test_search_hit_exposes_weknora_document_id(monkeypatch):
         arguments={"query": "实验", "kb_id": "bound"},
         allowed_knowledge_base_ids={"bound"},
     ))
-    assert result["items"][0]["document_id"] == "wk-1"
-    assert result["items"][0]["knowledge_id"] == "wk-1"
+    hit = result["items"][0]
+    assert hit["document_id"] == "wk-1"
+    for redundant in ("id", "knowledge_id", "score", "chunk_index", "knowledge_filename"):
+        assert redundant not in hit
 
 
 def test_search_result_excludes_internal_metadata_and_long_image_ocr(monkeypatch):
@@ -483,11 +497,13 @@ def test_search_result_excludes_internal_metadata_and_long_image_ocr(monkeypatch
          "caption": "直链缺陷"},
     ]
     assert hit["content"].startswith("显微图像显示桥接缺陷")
+    assert hit["content_truncated"] is True
+    assert len(hit["content"]) <= 600
     assert "resource://" not in hit["content"]
     assert "files/presigned" not in hit["content"]
-    assert len(hit["content"]) <= 1000
     assert "metadata" not in hit
     assert "matched_content" not in hit
+    assert "score" not in hit and "id" not in hit and "knowledge_id" not in hit
 
 
 def test_search_accepts_selected_libraries_and_removes_duplicates(monkeypatch):

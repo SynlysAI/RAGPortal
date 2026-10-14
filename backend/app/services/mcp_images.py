@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.services.download_ticket_service import create_image_ticket
 
-MAX_SEARCH_IMAGES = 3
 MAX_CAPTION_LENGTH = 300
 
 
@@ -57,7 +56,9 @@ async def search_image_markdown_blocks(
     """把命中的 resource:// 图片改写为门户短期链接并生成 Markdown 文本。
 
     http(s) 直链图片（WeKnora resource_urls=public 的返回）本身可加载，
-    原样保留在 image_info 中，不经过本函数签发。
+    原样保留在 image_info 中，不经过本函数签发。无论哪种来源，条目
+    最终形态统一为 {"url", "caption"}；签发失败的条目整体移除，避免
+    留下没有链接、误导模型引用的 caption。
 
     Args:
         result: 已完成知识库授权校验的检索结果。
@@ -72,15 +73,15 @@ async def search_image_markdown_blocks(
     blocks: list[dict[str, str]] = []
     for index, hit in enumerate(result.get("items", []), start=1):
         kb_id = hit.get("kb_id")
-        knowledge_id = str(hit.get("document_id") or hit.get("knowledge_id") or "")
+        knowledge_id = str(hit.get("document_id") or "")
         if not isinstance(kb_id, str) or not kb_id or not knowledge_id:
             continue
         image_entries = hit.get("image_info")
+        removals: list[int] = []
         for entry_index, entry in _resource_image_entries(image_entries):
             resource_path = entry.get("_resource_path")
             caption = str(entry.get("caption") or "SEM 显微图").strip()
             caption = caption.replace("]", "\\]").replace("\n", " ")[:MAX_CAPTION_LENGTH]
-            public_image = {"caption": caption}
             try:
                 ticket = await create_image_ticket(
                     session=session,
@@ -91,16 +92,14 @@ async def search_image_markdown_blocks(
                     ttl_seconds=ttl_seconds,
                 )
             except ValueError:
-                if isinstance(image_entries, list) and entry_index < len(image_entries):
-                    image_entries[entry_index] = public_image
+                removals.append(entry_index)
                 continue
             if base_url is None:
                 # 延迟到确有图片需要签发时才校验，直链结果不受本部署配置影响。
                 base_url = _public_base_url()
             image_url = f"{base_url}/api/mcp/images/{quote(ticket.secret, safe='')}"
-            public_image["markdown_url"] = image_url
             if isinstance(image_entries, list):
-                image_entries[entry_index] = public_image
+                image_entries[entry_index] = {"caption": caption, "url": image_url}
             blocks.append({
                 "type": "text",
                 "text": (
@@ -109,6 +108,9 @@ async def search_image_markdown_blocks(
                     f"![{caption}]({image_url})"
                 ),
             })
-            if len(blocks) >= MAX_SEARCH_IMAGES:
-                return blocks
+        # 按原始下标从高到低删除，避免前面的删除让后续下标错位。
+        if isinstance(image_entries, list):
+            for entry_index in sorted(removals, reverse=True):
+                if entry_index < len(image_entries):
+                    del image_entries[entry_index]
     return blocks

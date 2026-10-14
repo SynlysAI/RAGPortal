@@ -14,8 +14,26 @@ MAX_CONTENT_LENGTH = 600
 MAX_CAPTION_LENGTH = 160
 
 
+def _clean_text(value: Any) -> str:
+    """去掉上游混入的推理前缀和内联图片引用。
+
+    Args:
+        value: WeKnora 返回的文本值。
+
+    Returns:
+        清理后的完整文本，不截断。
+    """
+    if not isinstance(value, str):
+        return ""
+    text = value.rsplit("</think>", 1)[-1].strip()
+    # resource:// 与直链形式的内联图片都剥离，链接统一由 image_info 提供。
+    text = re.sub(r"!\[[^\]]*\]\(\s*(?:resource://|https?://)[^)]*\)", "", text)
+    text = re.sub(r"<image[^>]*resource://[^>]*>.*?</image>", "", text, flags=re.DOTALL)
+    return text.strip()
+
+
 def _visible_text(value: Any, limit: int) -> str:
-    """去掉上游混入的推理前缀并截取可展示文本。
+    """清理并截取可展示文本。
 
     Args:
         value: WeKnora 返回的文本值。
@@ -24,13 +42,7 @@ def _visible_text(value: Any, limit: int) -> str:
     Returns:
         适合工具结果展示的短文本。
     """
-    if not isinstance(value, str):
-        return ""
-    text = value.rsplit("</think>", 1)[-1].strip()
-    # resource:// 与直链形式的内联图片都剥离，链接统一由 image_info 提供。
-    text = re.sub(r"!\[[^\]]*\]\(\s*(?:resource://|https?://)[^)]*\)", "", text)
-    text = re.sub(r"<image[^>]*resource://[^>]*>.*?</image>", "", text, flags=re.DOTALL)
-    return text.strip()[:limit]
+    return _clean_text(value)[:limit]
 
 
 def _compact_images(raw_info: Any) -> list[dict[str, str]]:
@@ -70,6 +82,11 @@ def _compact_images(raw_info: Any) -> list[dict[str, str]]:
 def _compact_hit(item: dict[str, Any], kb_id: str, kb_name: str) -> dict[str, Any]:
     """把上游检索命中压缩为可追溯且可阅读的字段。
 
+    只保留智能体消费所需字段：document_id 用于链式调用其他工具，
+    content 超长时截断并以 content_truncated 标记，避免模型把半句
+    话当完整结论；与 knowledge_title 相同的文件名、chunk 自增序号、
+    跨库不可比的 score 等冗余字段一律不输出。
+
     Args:
         item: WeKnora 原始检索结果。
         kb_id: 已授权知识库 ID。
@@ -78,52 +95,28 @@ def _compact_hit(item: dict[str, Any], kb_id: str, kb_name: str) -> dict[str, An
     Returns:
         不含内部元数据和重复长文本的命中结果。
     """
+    title = item.get("knowledge_title") or item.get("knowledge_filename")
     hit = {
-        "id": item.get("id"),
         "document_id": item.get("knowledge_id"),
-        "knowledge_id": item.get("knowledge_id"),
-        "knowledge_title": item.get("knowledge_title"),
-        "knowledge_filename": item.get("knowledge_filename"),
-        "content": _visible_text(
-            item.get("content") or item.get("matched_content"),
-            MAX_CONTENT_LENGTH,
-        ),
+        "knowledge_title": title,
+        "content": "",
         "kb_id": kb_id,
         "kb_name": kb_name,
-        "score": item.get("score"),
-        "chunk_index": item.get("chunk_index"),
         "chunk_type": item.get("chunk_type"),
     }
+    filename = item.get("knowledge_filename")
+    if filename and filename != title:
+        hit["knowledge_filename"] = filename
+    text = _clean_text(item.get("content") or item.get("matched_content"))
+    if len(text) > MAX_CONTENT_LENGTH:
+        hit["content"] = text[:MAX_CONTENT_LENGTH]
+        hit["content_truncated"] = True
+    else:
+        hit["content"] = text
     images = _compact_images(item.get("image_info"))
     if images:
         hit["image_info"] = images
     return hit
-
-
-def format_search_text(result: dict[str, Any]) -> str:
-    """将结构化命中呈现为短文本，避免重复打印整个 JSON。
-
-    Args:
-        result: 已精简的检索结果。
-
-    Returns:
-        带来源和文档 ID 的可读摘要。
-    """
-    lines = []
-    for index, hit in enumerate(result.get("items", []), start=1):
-        title = hit.get("knowledge_title") or hit.get("knowledge_filename") or "未命名文档"
-        lines.append(
-            f"{index}. {title} | 知识库：{hit.get('kb_name') or hit.get('kb_id')} "
-            f"| 文档 ID：{hit.get('document_id') or '未知'}"
-        )
-        snippet = _visible_text(hit.get("content"), 220)
-        if snippet:
-            lines.append(snippet)
-        if hit.get("image_info"):
-            lines.append("含图片；图片链接见结构化结果的 image_info。")
-    if result.get("partial"):
-        lines.append("部分知识库检索失败，详情见结构化结果的 errors。")
-    return "\n".join(lines) if lines else "未找到相关文档。"
 
 
 def resolve_search_scope(
@@ -230,5 +223,4 @@ async def search_libraries(
         "kb_ids": kb_ids,
         "partial": bool(errors),
         "errors": errors,
-        "ranking": "按各知识库内部排名交错合并",
     }

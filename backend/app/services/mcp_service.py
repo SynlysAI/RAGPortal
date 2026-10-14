@@ -52,7 +52,15 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "rag_search",
-        "description": "检索 Token 授权的知识库。不传范围时检索全部绑定库；可用 kb_id 或 kb_ids 指定范围，二者不可同时提供。top_k 为最终结果总数。",
+        "description": (
+            "检索 Token 授权的知识库并返回最相关的命中。"
+            "不传范围时检索全部绑定库；可用 kb_id 或 kb_ids 指定范围，二者不可同时提供；"
+            "top_k 为最终结果总数。items 顺序即相关性从高到低（跨库按各库内部排名交错合并，"
+            "无统一可比分数）。content 为命中正文摘录，超过 600 字符会截断并以 content_truncated 标注。"
+            "image_info 中的 url 是可直接加载的图片地址：当图片与回答相关时，"
+            "必须用 Markdown 图片语法 ![图片说明](url) 在回答中嵌入展示，"
+            "图片说明使用 caption 字段；不要只输出裸链接，也不要省略图片。"
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -67,13 +75,42 @@ TOOL_DEFINITIONS = [
         "outputSchema": {
             "type": "object",
             "properties": {
-                "items": {"type": "array", "items": {"type": "object"}},
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "document_id": {
+                                "type": "string",
+                                "description": "文档 ID，可传给 rag_get_document / rag_download_file",
+                            },
+                            "knowledge_title": {"type": "string"},
+                            "knowledge_filename": {"type": "string"},
+                            "content": {"type": "string"},
+                            "content_truncated": {"type": "boolean"},
+                            "kb_id": {"type": "string"},
+                            "kb_name": {"type": "string"},
+                            "chunk_type": {"type": "string"},
+                            "image_info": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {"type": "string"},
+                                        "caption": {"type": "string"},
+                                    },
+                                    "required": ["url", "caption"],
+                                },
+                            },
+                        },
+                        "required": ["document_id", "kb_id", "content"],
+                    },
+                },
                 "kb_ids": {"type": "array", "items": {"type": "string"}},
                 "partial": {"type": "boolean"},
                 "errors": {"type": "array", "items": {"type": "object"}},
-                "ranking": {"type": "string"},
             },
-            "required": ["items", "kb_ids", "partial", "errors", "ranking"],
+            "required": ["items", "kb_ids", "partial", "errors"],
         },
     },
     {

@@ -29,10 +29,7 @@ async def test_search_image_blocks_create_markdown_links(monkeypatch):
     result = {"items": [{
         "kb_id": "kb-a",
         "document_id": "wk-1",
-        "image_info": json.dumps([{
-            "url": "resource://abc123",
-            "caption": "实验布局图",
-        }]),
+        "image_info": [{"_resource_path": "resource://abc123", "caption": "实验布局图"}],
     }]}
 
     blocks = await mcp_images.search_image_markdown_blocks(result, None, 7)
@@ -41,6 +38,10 @@ async def test_search_image_blocks_create_markdown_links(monkeypatch):
     assert blocks[0]["type"] == "text"
     assert "![实验布局图]" in blocks[0]["text"]
     assert "https://rag.example.com/api/mcp/images/rim_temporary" in blocks[0]["text"]
+    assert result["items"][0]["image_info"] == [{
+        "caption": "实验布局图",
+        "url": "https://rag.example.com/api/mcp/images/rim_temporary",
+    }]
     ticket_mock.assert_awaited_once_with(
         session=None,
         api_token_id=7,
@@ -104,7 +105,7 @@ async def test_mcp_search_response_only_contains_json_text(monkeypatch):
     assert serialized == response["result"]["structuredContent"]
     assert serialized["items"][0]["image_info"] == [{
         "caption": "凝胶电泳结果图",
-        "markdown_url": "https://rag.example.com/api/mcp/images/rim_x",
+        "url": "https://rag.example.com/api/mcp/images/rim_x",
     }]
     assert "resource://" not in content[0]["text"]
 
@@ -162,7 +163,36 @@ async def test_direct_link_images_skip_ticket_and_keep_position(monkeypatch):
     assert result["items"][0]["image_info"][0] == {
         "url": direct_url, "caption": "直链图",
     }
-    assert result["items"][0]["image_info"][1]["markdown_url"] == (
+    assert result["items"][0]["image_info"][1]["url"] == (
         "https://rag.example.com/api/mcp/images/rim_mixed"
     )
     ticket_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_failed_ticket_removes_image_entry(monkeypatch):
+    """签发失败的图片整条删除，不留下没有链接的 caption。"""
+    monkeypatch.setattr(mcp_images, "create_image_ticket", AsyncMock(
+        side_effect=ValueError("Token 无权读取此检索图片"),
+    ))
+    monkeypatch.setattr(mcp_images, "get_settings", lambda: SimpleNamespace(
+        mcp_public_base_url="https://rag.example.com",
+        frontend_origin="http://localhost:3002",
+        mcp_image_url_ttl_seconds=2_592_000,
+        app_env="production",
+    ))
+    result = {"items": [{
+        "kb_id": "kb-a",
+        "document_id": "wk-1",
+        "image_info": [
+            {"_resource_path": "resource://abc123", "caption": "无权图"},
+            {"url": "https://weknora.test/r/keep", "caption": "直链图"},
+        ],
+    }]}
+
+    blocks = await mcp_images.search_image_markdown_blocks(result, None, 7)
+
+    assert blocks == []
+    assert result["items"][0]["image_info"] == [
+        {"url": "https://weknora.test/r/keep", "caption": "直链图"},
+    ]
