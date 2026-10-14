@@ -27,13 +27,17 @@ def _visible_text(value: Any, limit: int) -> str:
     if not isinstance(value, str):
         return ""
     text = value.rsplit("</think>", 1)[-1].strip()
-    text = re.sub(r"!\[[^\]]*\]\(\s*resource://[^)]*\)", "", text)
+    # resource:// 与直链形式的内联图片都剥离，链接统一由 image_info 提供。
+    text = re.sub(r"!\[[^\]]*\]\(\s*(?:resource://|https?://)[^)]*\)", "", text)
     text = re.sub(r"<image[^>]*resource://[^>]*>.*?</image>", "", text, flags=re.DOTALL)
     return text.strip()[:limit]
 
 
 def _compact_images(raw_info: Any) -> list[dict[str, str]]:
     """只保留图片引用和短说明，不返回冗长 OCR。
+
+    resource:// 引用以 _resource_path 透传给后续凭证签发；http(s) 直链
+    （WeKnora resource_urls=public 的返回）保持可加载 URL 原样输出。
 
     Args:
         raw_info: WeKnora image_info 字符串或列表。
@@ -53,12 +57,13 @@ def _compact_images(raw_info: Any) -> list[dict[str, str]]:
         if not isinstance(entry, dict):
             continue
         url = entry.get("url") or entry.get("original_url")
-        if not isinstance(url, str) or not url.startswith("resource://"):
+        if not isinstance(url, str):
             continue
-        images.append({
-            "_resource_path": url,
-            "caption": _visible_text(entry.get("caption"), MAX_CAPTION_LENGTH),
-        })
+        caption = _visible_text(entry.get("caption"), MAX_CAPTION_LENGTH)
+        if url.startswith("resource://"):
+            images.append({"_resource_path": url, "caption": caption})
+        elif url.startswith(("http://", "https://")):
+            images.append({"url": url, "caption": caption})
     return images
 
 
@@ -115,7 +120,7 @@ def format_search_text(result: dict[str, Any]) -> str:
         if snippet:
             lines.append(snippet)
         if hit.get("image_info"):
-            lines.append("含图片；图片链接见后续 Markdown 图片。")
+            lines.append("含图片；图片链接见结构化结果的 image_info。")
     if result.get("partial"):
         lines.append("部分知识库检索失败，详情见结构化结果的 errors。")
     return "\n".join(lines) if lines else "未找到相关文档。"

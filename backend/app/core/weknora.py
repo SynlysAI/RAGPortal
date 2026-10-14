@@ -97,6 +97,10 @@ async def get_knowledge(knowledge_id: str) -> dict[str, Any]:
 async def search_knowledge(*, kb_id: str, query: str, top_k: int = 5) -> dict[str, Any]:
     """代理 WeKnora 单库混合检索并规范化命中列表。
 
+    请求带 resource_urls=public，让 WeKnora 把图片等资源引用改写为可直接
+    加载的 http(s) 短期直链；部署未配置 APP_EXTERNAL_URL 时上游会静默保持
+    resource:// 内部引用。受限 API Key 无权获得直链（403）时退回默认模式。
+
     Args:
         kb_id: 已授权知识库 ID。
         query: 检索问题。
@@ -105,11 +109,17 @@ async def search_knowledge(*, kb_id: str, query: str, top_k: int = 5) -> dict[st
     Returns:
         包含 items 命中列表的字典。
     """
+    payload = {"query_text": query, "match_count": max(1, min(top_k, 20))}
+    search_path = f"/api/v1/knowledge-bases/{kb_id}/hybrid-search"
     async with _client() as c:
         resp = await c.post(
-            f"/api/v1/knowledge-bases/{kb_id}/hybrid-search",
-            json={"query_text": query, "match_count": max(1, min(top_k, 20))},
+            search_path,
+            json=payload,
+            params={"resource_urls": "public"},
         )
+        if resp.status_code == 403:
+            # 知识库受限的 API Key 被上游拒绝直链模式，改用默认内部引用重试。
+            resp = await c.post(search_path, json=payload)
     if resp.status_code != 200:
         raise WeknoraError(resp.status_code, "WeKnora 检索失败", _safe_json(resp))
     payload = _safe_json(resp)

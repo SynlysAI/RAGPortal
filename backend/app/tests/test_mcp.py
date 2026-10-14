@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from datetime import datetime, timezone
@@ -451,10 +452,19 @@ def test_search_result_excludes_internal_metadata_and_long_image_ocr(monkeypatch
             "id": "chunk-1",
             "knowledge_id": "wk-1",
             "knowledge_title": "实验论文",
-            "content": "前置推理</think>显微图像显示桥接缺陷。" + "后文" * 1000,
+            "content": (
+                "前置推理</think>显微图像显示桥接缺陷。"
+                "![内链图](resource://abc123)"
+                "![直链图](https://weknora.test/api/v1/files/presigned?file_path=x)"
+                + "后文" * 1000
+            ),
             "matched_content": "重复内容" * 1000,
             "metadata": {"process_overrides": "冗长内部配置" * 1000},
-            "image_info": '[{"url":"resource://abc123","caption":"桥接缺陷","ocr_text":"OCR"}]',
+            "image_info": json.dumps([
+                {"url": "resource://abc123", "caption": "桥接缺陷", "ocr_text": "OCR"},
+                {"url": "https://weknora.test/api/v1/files/presigned?file_path=y",
+                 "caption": "直链缺陷", "ocr_text": "OCR"},
+            ]),
             "score": 0.25,
         }],
     }))
@@ -467,8 +477,14 @@ def test_search_result_excludes_internal_metadata_and_long_image_ocr(monkeypatch
     hit = result["items"][0]
     assert hit["document_id"] == "wk-1"
     assert hit["knowledge_title"] == "实验论文"
-    assert hit["image_info"] == [{"_resource_path": "resource://abc123", "caption": "桥接缺陷"}]
+    assert hit["image_info"] == [
+        {"_resource_path": "resource://abc123", "caption": "桥接缺陷"},
+        {"url": "https://weknora.test/api/v1/files/presigned?file_path=y",
+         "caption": "直链缺陷"},
+    ]
     assert hit["content"].startswith("显微图像显示桥接缺陷")
+    assert "resource://" not in hit["content"]
+    assert "files/presigned" not in hit["content"]
     assert len(hit["content"]) <= 1000
     assert "metadata" not in hit
     assert "matched_content" not in hit

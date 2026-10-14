@@ -111,12 +111,58 @@ async def test_mcp_search_response_only_contains_json_text(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_search_image_links_reject_invalid_public_url(monkeypatch):
-    """生产环境拒绝 HTTP 图片链接。"""
+    """生产环境签发 resource:// 图片凭证前拒绝 HTTP 图片链接。"""
+    monkeypatch.setattr(mcp_images, "create_image_ticket", AsyncMock(
+        return_value=SimpleNamespace(
+            secret="rim_temporary",
+            expires_at=datetime(2026, 10, 27, 7, 0, tzinfo=timezone.utc),
+        ),
+    ))
     monkeypatch.setattr(mcp_images, "get_settings", lambda: SimpleNamespace(
         mcp_public_base_url="http://rag.example.com",
         frontend_origin="http://localhost:3002",
         mcp_image_url_ttl_seconds=2_592_000,
         app_env="production",
     ))
+    result = {"items": [{
+        "kb_id": "kb-a",
+        "document_id": "wk-1",
+        "image_info": [{"_resource_path": "resource://abc123", "caption": "实验图"}],
+    }]}
     with pytest.raises(ValueError):
-        await mcp_images.search_image_markdown_blocks({"items": []}, None, 7)
+        await mcp_images.search_image_markdown_blocks(result, None, 7)
+
+
+@pytest.mark.asyncio
+async def test_direct_link_images_skip_ticket_and_keep_position(monkeypatch):
+    """直链图片原样保留，resource:// 条目按原始下标回写不被错位覆盖。"""
+    ticket_mock = AsyncMock(return_value=SimpleNamespace(
+        secret="rim_mixed",
+        expires_at=datetime(2026, 10, 27, 7, 0, tzinfo=timezone.utc),
+    ))
+    monkeypatch.setattr(mcp_images, "create_image_ticket", ticket_mock)
+    monkeypatch.setattr(mcp_images, "get_settings", lambda: SimpleNamespace(
+        mcp_public_base_url="https://rag.example.com",
+        frontend_origin="http://localhost:3002",
+        mcp_image_url_ttl_seconds=2_592_000,
+        app_env="production",
+    ))
+    direct_url = "https://weknora.test/api/v1/files/presigned?file_path=y"
+    result = {"items": [{
+        "kb_id": "kb-a",
+        "document_id": "wk-1",
+        "image_info": [
+            {"url": direct_url, "caption": "直链图"},
+            {"_resource_path": "resource://abc123", "caption": "内链图"},
+        ],
+    }]}
+
+    await mcp_images.search_image_markdown_blocks(result, None, 7)
+
+    assert result["items"][0]["image_info"][0] == {
+        "url": direct_url, "caption": "直链图",
+    }
+    assert result["items"][0]["image_info"][1]["markdown_url"] == (
+        "https://rag.example.com/api/mcp/images/rim_mixed"
+    )
+    ticket_mock.assert_awaited_once()
