@@ -12,3 +12,11 @@ def test_spa_route_falls_back_to_index_html():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert "<div id=\"root\"></div>" in response.text
+
+
+def test_unknown_api_route_returns_not_found():
+    """未知 API 路由不能返回前端 index.html 伪装成成功。"""
+    with TestClient(app) as client:
+        response = client.get("/api/definitely-not-a-route")
+
+    assert response.status_code == 404
