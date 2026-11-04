@@ -231,16 +231,17 @@ CREATE INDEX idx_uploads_time      ON uploads(uploaded_at DESC);
 
 ### `parse_status` 状态映射
 
-WeKnora 内部 `parse_status` 有多种细分值,RAGPortal 这边做粗粒度映射,只保留 4 种对外暴露:
+WeKnora 内部 `parse_status` 有多种细分值,RAGPortal 这边做粗粒度映射,只保留 5 种对外暴露:
 
 | WeKnora 状态 | RAGPortal `parse_status` | UI 徽标 |
 |--------------|--------------------------|---------|
 | `pending` | `pending` | ⌛ 等待中(灰色) |
-| `processing` / `finalizing` / `reprocessing` | `processing` | ⏳ 处理中(蓝色) |
-| `success` / `completed` / `enabled` | `success` | ✓ 成功(绿色) |
+| `processing` / `reprocessing` | `processing` | ⏳ 处理中(蓝色) |
+| `success` / `finalizing` / `completed` / `enabled` | `success` | ✓ 基础解析完成,可引用(绿色) |
 | `failed` / `error` / 其他 | `failed` | ✗ 失败(红色),`parse_error` 存 WeKnora 原始 message |
+| `deleted` | `deleted` | ✗ 上游已删除(红色) |
 
-懒同步时按上表把 WeKnora 返回值映射到 RAGPortal 状态。终态(`success`/`failed`)不再同步。
+懒同步时按上表把 WeKnora 返回值映射到 RAGPortal 状态。终态(`success`/`failed`/`deleted`)不再同步。`finalizing` 已完成基础解析并归并为可引用的 `success`;后台问答索引仍可能继续。
 
 ## 6. 前端页面结构
 
