@@ -21,7 +21,7 @@ module.exports = {
   apps: [
     {
       name: 'ragportal',
-      script: '/polymer/conda/envs/ragportal/bin/uvicorn',
+      script: __dirname + '/backend/.venv/bin/uvicorn',
       args: 'app.main:app --host 0.0.0.0 --port 8004 --no-access-log',
       cwd: __dirname + '/backend',
       env: {
