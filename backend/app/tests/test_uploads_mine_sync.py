@@ -5,6 +5,7 @@ from app.api.v1.auth import UserInfo, get_current_user
 from app.api.v1 import uploads as uploads_api
 from app.core.db import get_session
 from app.main import app
+from app.services.sync_service import _map_status
 
 
 class _FakeScalarResult:
@@ -16,6 +17,10 @@ class _FakeScalarResult:
     def all(self):
         """返回查询结果列表。"""
         return self._items
+
+    def first(self):
+        """返回第一行，供单条上传详情查询复用。"""
+        return self._items[0] if self._items else None
 
 
 class _FakeResult:
@@ -85,5 +90,54 @@ def test_my_uploads_list_triggers_status_sync(monkeypatch):
             resp = client.get("/api/uploads/mine")
         assert resp.status_code == 200
         assert resp.json()["items"][0]["parse_status"] == "success"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_detail_reports_finalizing_as_reference_ready(monkeypatch):
+    """基础解析完成的 finalizing 记录应通过上传详情返回 success。"""
+    upload = uploads_api.Upload(
+        id=743,
+        knowledge_id="k-finalizing",
+        kb_id="kb-1",
+        kb_name="测试知识库",
+        uploader_user_id="u1",
+        uploader_username="alice",
+        uploader_organization="R&D",
+        file_name="paper.pdf",
+        file_type="pdf",
+        file_size=123,
+        file_hash="",
+        parse_status="processing",
+        parse_error="",
+        weknora_task_id="",
+        uploaded_at="2026-11-04T18:16:00+08:00",
+        last_synced_at="2026-11-04T18:16:00+08:00",
+    )
+
+    async def fake_sync_one(session, item):
+        """模拟 WeKnora 已进入 finalizing 的懒同步。"""
+        item.parse_status, item.parse_error = _map_status("finalizing")
+        return item
+
+    async def fake_session_dep():
+        """提供假的数据库会话。"""
+        yield _FakeSession([upload])
+
+    monkeypatch.setattr(uploads_api, "sync_one", fake_sync_one)
+    app.dependency_overrides[get_current_user] = lambda: UserInfo(
+        user_id="u1",
+        username="alice",
+        role="user",
+        status="active",
+        organization="R&D",
+    )
+    app.dependency_overrides[get_session] = fake_session_dep
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/uploads/743")
+        assert response.status_code == 200
+        assert response.json()["parse_status"] == "success"
     finally:
         app.dependency_overrides.clear()
