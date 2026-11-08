@@ -2,7 +2,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """构建 FastAPI 实例并挂载路由。"""
     settings = get_settings()
-    app = FastAPI(title="RAGPortal", version="0.5.1", lifespan=lifespan)
+    app = FastAPI(title="RAGPortal", version="0.6.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -73,6 +73,8 @@ if os.path.isdir(_frontend_dist):
         Returns:
             静态资源文件或前端入口页。
         """
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
         file_path = os.path.join(_frontend_dist, full_path)
         if full_path and os.path.isfile(file_path):
             return FileResponse(file_path)

@@ -62,6 +62,7 @@ def test_upload_accepts_complete_research_metadata(monkeypatch):
         assert payload["task_id"] == "task-1"
         assert captured["research_project_id"] == payload["research_project_id"]
         assert captured["file_sha256"] == "a" * 64
+        assert captured["max_size_bytes"] == 500 * 1024 * 1024
     finally:
         app.dependency_overrides.clear()
 
@@ -272,5 +273,49 @@ def test_upload_accepts_complete_group_metadata_for_different_chains(monkeypatch
         assert [item["kb_id"] for item in captured] == ["kb-team", "kb-team"]
         assert captured[0]["chain_id"] != captured[1]["chain_id"]
         assert captured[0]["org_unit_id"] == "33333333-3333-3333-3333-333333333333"
+        assert all(item["max_size_bytes"] == 500 * 1024 * 1024 for item in captured)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_without_research_metadata_keeps_the_legacy_100mb_limit(monkeypatch):
+    """普通门户上传继续使用原有 100MB 上限。"""
+    captured = {}
+
+    async def fake_handle_upload(**kwargs):
+        """记录普通上传的大小参数。"""
+        captured.update(kwargs)
+        return Upload(
+            knowledge_id="knowledge-legacy-upload",
+            kb_id=kwargs["kb_id"],
+            kb_name="Materials",
+            uploader_user_id=kwargs["uploader_user_id"],
+            uploader_username=kwargs["uploader_username"],
+            uploader_organization=kwargs["uploader_organization"],
+            file_name="paper.pdf",
+            file_type="pdf",
+            file_size=4,
+            weknora_task_id="task-legacy",
+            parse_status="pending",
+        )
+
+    async def fake_session_dep():
+        """普通上传测试不需要真实数据库事务。"""
+        yield None
+
+    monkeypatch.setattr("app.api.v1.uploads.handle_upload", fake_handle_upload)
+    app.dependency_overrides[get_current_user] = lambda: UserInfo(
+        user_id="user-1", username="alice", role="user", status="active", organization="R&D"
+    )
+    app.dependency_overrides[get_session] = fake_session_dep
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/uploads",
+                data={"kb_id": "kb-1"},
+                files={"file": ("paper.pdf", b"pdf", "application/pdf")},
+            )
+        assert response.status_code == 200, response.text
+        assert captured["max_size_bytes"] == 100 * 1024 * 1024
     finally:
         app.dependency_overrides.clear()
