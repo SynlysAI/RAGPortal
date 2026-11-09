@@ -9,6 +9,7 @@ from app.models.upload import Upload
 
 DELETED_STATUS = "deleted"
 DELETED_ERROR = "上游文档已删除"
+CANCELLED_ERROR = "上游文档处理已取消"
 
 
 def _map_status(weknora_status: str) -> tuple[str, str]:
@@ -19,15 +20,19 @@ def _map_status(weknora_status: str) -> tuple[str, str]:
 
     Returns:
         (ragportal_status, parse_error_placeholder)。
-        failed 时 error_message 由调用方注入。
+        failed 时 error_message 由调用方注入；deleted/cancelled 使用固定错误文案。
     """
     s = (weknora_status or "").lower()
-    if s in ("success", "completed", "enabled"):
+    if s in ("success", "completed", "enabled", "finalizing"):
         return "success", ""
-    if s in ("processing", "finalizing", "reprocessing"):
+    if s in ("processing", "reprocessing"):
         return "processing", ""
     if s in ("failed", "error"):
         return "failed", ""
+    if s == "cancelled":
+        return "failed", CANCELLED_ERROR
+    if s == DELETED_STATUS:
+        return DELETED_STATUS, DELETED_ERROR
     return "pending", ""
 
 
@@ -56,9 +61,9 @@ async def sync_one(session: AsyncSession, upload: Upload) -> Upload:
         await session.commit()
         return upload
     weknora_status = data.get("parse_status", "")
-    new_status, _ = _map_status(weknora_status)
-    error_msg = ""
-    if new_status == "failed":
+    new_status, mapped_error = _map_status(weknora_status)
+    error_msg = mapped_error
+    if new_status == "failed" and not error_msg:
         error_msg = data.get("error_message", "") or data.get("error", "")
     file_hash = str(data.get("file_hash") or "").strip()
     upload.parse_status = new_status

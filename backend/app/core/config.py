@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # 上传
     upload_max_size_mb: int = 100
+    research_upload_max_size_mb: int = 500
     upload_concurrency: int = 5
     allowed_file_types: str = "pdf,doc,docx,xls,xlsx,ppt,pptx,md,txt,csv,html"
 

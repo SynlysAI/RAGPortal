@@ -113,6 +113,11 @@ async def upload(
         org_unit_name=org_unit_name,
         chain_id=chain_id,
     )
+    max_size_mb = (
+        settings.research_upload_max_size_mb
+        if research_metadata["workspace_slug"]
+        else settings.upload_max_size_mb
+    )
     try:
         record = await handle_upload(
             session=session,
@@ -128,7 +133,7 @@ async def upload(
             org_unit_name=group_metadata["org_unit_name"],
             chain_id=group_metadata["chain_id"],
             file_sha256=(file_sha256 or "").strip(),
-            max_size_bytes=settings.upload_max_size_mb * 1024 * 1024,
+            max_size_bytes=max_size_mb * 1024 * 1024,
             allowed_types=settings.allowed_file_types_set,
         )
     except UploadError as e:
